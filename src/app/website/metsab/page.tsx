@@ -12,7 +12,7 @@ export default function MetsabWebsitePage() {
       brandCode="METSAB"
       brandId={1}
       envVar="NEXT_PUBLIC_FRONTEND_URL_METSAB"
-      fallbackUrl="http://localhost:3002"
+      fallbackUrl="https://metsab-auctions-delta.vercel.app"
       gradientFrom="from-blue-600"
       gradientTo="to-blue-700"
       primaryColor="bg-blue-600"

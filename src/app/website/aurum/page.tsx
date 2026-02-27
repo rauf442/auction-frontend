@@ -12,7 +12,7 @@ export default function AurumWebsitePage() {
       brandCode="AURUM"
       brandId={2}
       envVar="NEXT_PUBLIC_FRONTEND_URL_AURUM"
-      fallbackUrl="http://localhost:3003"
+      fallbackUrl="https://aurum-auctions-one.vercel.app"
       gradientFrom="from-amber-600"
       gradientTo="to-orange-600"
       primaryColor="bg-amber-600"
