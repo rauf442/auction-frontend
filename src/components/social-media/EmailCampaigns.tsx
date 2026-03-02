@@ -46,7 +46,7 @@ export default function EmailCampaigns() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/social-media/email-campaigns', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -68,7 +68,7 @@ export default function EmailCampaigns() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/social-media/email-campaigns/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns/${id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,

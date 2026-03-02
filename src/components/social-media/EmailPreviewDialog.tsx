@@ -47,7 +47,7 @@ export default function EmailPreviewDialog({
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/social-media/email-campaigns/preview', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns/preview`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +77,7 @@ export default function EmailPreviewDialog({
       setSending(true);
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3001/api/social-media/email-campaigns/${campaign.id}/send`,
+  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns/${campaign.id}/send`,
         {
           method: 'POST',
           headers: {
@@ -112,7 +112,7 @@ export default function EmailPreviewDialog({
       setSending(true);
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3001/api/social-media/email-campaigns/${campaign.id}/send`,
+  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns/${campaign.id}/send`,
         {
           method: 'POST',
           headers: {
