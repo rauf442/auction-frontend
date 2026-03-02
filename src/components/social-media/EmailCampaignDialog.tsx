@@ -73,7 +73,7 @@ export default function EmailCampaignDialog({
   const fetchBrands = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/brands', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/brands`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -99,8 +99,8 @@ export default function EmailCampaignDialog({
     try {
       const token = localStorage.getItem('token');
       const url = campaign
-        ? `http://localhost:3001/api/social-media/email-campaigns/${campaign.id}`
-        : 'http://localhost:3001/api/social-media/email-campaigns';
+  ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns/${campaign.id}`
+  : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns`;
 
       const response = await fetch(url, {
         method: campaign ? 'PUT' : 'POST',
