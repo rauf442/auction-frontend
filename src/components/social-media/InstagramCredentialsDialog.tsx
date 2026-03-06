@@ -58,7 +58,7 @@ export default function InstagramCredentialsDialog({
     try {
       setBrandsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/brands', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/brands`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -85,7 +85,7 @@ export default function InstagramCredentialsDialog({
       setLoading(true);
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3001/api/social-media/instagram/credentials/${brandId}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/instagram/credentials/${brandId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -131,7 +131,7 @@ export default function InstagramCredentialsDialog({
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        'http://localhost:3001/api/social-media/instagram/credentials',
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/instagram/credentials`,
         {
           method: 'POST',
           headers: {
