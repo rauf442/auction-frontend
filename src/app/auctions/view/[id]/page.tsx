@@ -251,9 +251,10 @@ export default function AuctionViewPage() {
     router.push(`/auctions/${auctionId}/invoices`)
   }
 
-  const handlePreview = (artworkId: string) => {
-    router.push(`/items/${artworkId}`)
-  }
+const handlePreview = (artworkId: string) => {
+  sessionStorage.setItem('itemsBackUrl', `/auctions/view/${auctionId}`)
+  router.push(`/items/${artworkId}`)
+}
 
   
   // Handle sharing auction

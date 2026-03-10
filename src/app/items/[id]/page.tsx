@@ -212,7 +212,11 @@ export default function ItemPreviewPage() {
         <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           <div className="flex items-center justify-between h-20">
             <button
-              onClick={() => router.push('/items')}
+              onClick={() => {
+  const backUrl = sessionStorage.getItem('itemsBackUrl') || '/items'
+  sessionStorage.removeItem('itemsBackUrl')
+  router.push(backUrl)
+}}
               className="flex items-center gap-3 text-slate-600 hover:text-slate-900 transition-all hover:gap-4 group"
             >
               <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
