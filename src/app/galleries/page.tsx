@@ -1,12 +1,11 @@
 // frontend/src/app/galleries/page.tsx
 'use client'
 
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { Plus, Search, Download, Edit, Trash2, Building2, Sparkles, ExternalLink, Share2, ChevronDown, X } from 'lucide-react'
 import { GalleriesAPI, Gallery, GalleriesFilters } from '@/lib/galleries-api'
-import { LoadScript, StandaloneSearchBox, useJsApiLoader } from '@react-google-maps/api'
 import ExportShareModal from '@/components/ExportShareModal'
 import { useExportShare } from '@/hooks/useExportShare'
 import { ListPageHeader } from '@/components/layout/ListPageHeader'
@@ -72,12 +71,28 @@ function CustomDropdown({ label, value, options, onChange, defaultValue }: {
   )
 }
 
+interface NominatimResult {
+  place_id: number
+  display_name: string
+  name: string
+  address: {
+    city?: string
+    country?: string
+    state?: string
+  }
+  lat: string
+  lon: string
+}
+
 export default function GalleriesPage() {
   const [galleries, setGalleries] = useState<Gallery[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedPlace, setSelectedPlace] = useState<google.maps.places.PlaceResult | null>(null)
+  const [nominatimResults, setNominatimResults] = useState<NominatimResult[]>([])
+  const [nominatimLoading, setNominatimLoading] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [selectedPlace, setSelectedPlace] = useState<NominatimResult | null>(null)
   const [showAddOption, setShowAddOption] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [filters, setFilters] = useState<GalleriesFilters>({
@@ -94,15 +109,8 @@ export default function GalleriesPage() {
     pages: 0
   })
 
-  const searchBoxRef = useRef<google.maps.places.SearchBox | null>(null)
-  const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
-  const placesLibraries = useMemo(() => ['places'] as ("places")[], [])
-
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: googleApiKey,
-    libraries: placesLibraries,
-  })
-
+  const searchRef = useRef<HTMLDivElement>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [userRole] = useState<string>('admin')
 
   const galleryExportFields = [
@@ -129,6 +137,17 @@ export default function GalleriesPage() {
     userRole: userRole
   })
 
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   useEffect(() => {
     loadGalleries()
   }, [filters])
@@ -150,6 +169,89 @@ export default function GalleriesPage() {
       setError(err.message || 'Failed to load galleries')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Search using Nominatim (OpenStreetMap) - completely free, no API key
+  const searchNominatim = useCallback(async (query: string) => {
+    if (!query.trim() || query.length < 3) {
+      setNominatimResults([])
+      setShowSuggestions(false)
+      return
+    }
+
+    try {
+      setNominatimLoading(true)
+      const response = await fetch(
+  `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&addressdetails=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      )
+      const data = await response.json()
+      setNominatimResults(data)
+setShowSuggestions(true)
+    } catch (err) {
+      console.error('Nominatim search error:', err)
+      setNominatimResults([])
+    } finally {
+      setNominatimLoading(false)
+    }
+  }, [])
+
+  const handleSearchTermChange = (value: string) => {
+    setSearchTerm(value)
+    setShowAddOption(false)
+    setSelectedPlace(null)
+
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+
+    if (!value) {
+      setNominatimResults([])
+      setShowSuggestions(false)
+      return
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      searchNominatim(value)
+    }, 400)
+  }
+
+  const handleSelectPlace = (place: NominatimResult) => {
+    setSearchTerm(place.name || place.display_name.split(',')[0])
+    setSelectedPlace(place)
+    setShowAddOption(true)
+    setShowSuggestions(false)
+  }
+
+  const handleGoogleSearch = () => {
+    if (selectedPlace) {
+      const name = selectedPlace.name || searchTerm
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(name + ' gallery')}`, '_blank')
+    }
+  }
+
+  const handleAiGenerateFromPlace = async () => {
+    if (!selectedPlace && !searchTerm) return
+    try {
+      setAiGenerating(true)
+      const name = selectedPlace?.name || searchTerm
+      const location = selectedPlace?.display_name || ''
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/galleries/generate-ai`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ name, location })
+      })
+      if (!response.ok) throw new Error('Failed to generate AI content')
+      const data = await response.json()
+      if (data.success) {
+        const galleryData = { ...data.data, name }
+        const params = new URLSearchParams()
+        Object.entries(galleryData).forEach(([key, value]) => { if (value) params.append(key, value.toString()) })
+        window.location.href = `/galleries/new?${params.toString()}`
+      }
+    } catch (err: any) {
+      toast.error(`Failed to generate gallery details: ${err.message}`)
+    } finally {
+      setAiGenerating(false)
     }
   }
 
@@ -178,48 +280,6 @@ export default function GalleriesPage() {
       await GalleriesAPI.exportCSV(filters)
     } catch (err: any) {
       toast.error(`Failed to export galleries: ${err.message}`)
-    }
-  }
-
-  const handlePlacesChanged = () => {
-    const box = searchBoxRef.current
-    if (!box) return
-    const places = box.getPlaces()
-    if (places && places.length > 0) {
-      const place = places[0]
-      setSelectedPlace(place)
-      setShowAddOption(true)
-      setSearchTerm(place.name || '')
-    }
-  }
-
-  const handleGoogleSearch = () => {
-    if (selectedPlace?.name) {
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedPlace.name + ' gallery')}`, '_blank')
-    }
-  }
-
-  const handleAiGenerateFromPlace = async () => {
-    if (!selectedPlace?.name) return
-    try {
-      setAiGenerating(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/galleries/generate-ai`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ name: selectedPlace.name, location: selectedPlace.formatted_address })
-      })
-      if (!response.ok) throw new Error('Failed to generate AI content')
-      const data = await response.json()
-      if (data.success) {
-        const galleryData = { ...data.data, name: selectedPlace.name }
-        const params = new URLSearchParams()
-        Object.entries(galleryData).forEach(([key, value]) => { if (value) params.append(key, value.toString()) })
-        window.location.href = `/galleries/new?${params.toString()}`
-      }
-    } catch (err: any) {
-      toast.error(`Failed to generate gallery details: ${err.message}`)
-    } finally {
-      setAiGenerating(false)
     }
   }
 
@@ -282,37 +342,58 @@ export default function GalleriesPage() {
         <section className="rounded-3xl border border-slate-200 bg-white/95 shadow-sm">
           <div className="border-b border-slate-100 px-6 py-6">
             <div className="space-y-4">
+
+              {/* World Famous Galleries Search - Now using Nominatim */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Search World Famous Galleries</label>
-                {isLoaded && (
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1 relative">
-                      <Search className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
-                      <StandaloneSearchBox onLoad={(ref) => { searchBoxRef.current = ref }} onPlacesChanged={handlePlacesChanged}>
-                        <input
-                          type="text"
-                          placeholder="Search famous galleries like Louvre, MoMA, Tate Modern..."
-                          value={searchTerm}
-                          onChange={(e) => { setSearchTerm(e.target.value); if (!e.target.value) { setShowAddOption(false); setSelectedPlace(null) } }}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        />
-                      </StandaloneSearchBox>
-                    </div>
-                    {showAddOption && selectedPlace && (
-                      <>
-                        <button type="button" onClick={handleGoogleSearch} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer">
-                          <ExternalLink className="h-4 w-4 mr-2" />Search
-                        </button>
-                        <button type="button" onClick={handleAiGenerateFromPlace} disabled={aiGenerating} className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 cursor-pointer">
-                          {aiGenerating ? <div className="animate-spin rounded-full h-4 w-4 mr-2 border-b-2 border-white"></div> : <Sparkles className="h-4 w-4 mr-2" />}
-                          {aiGenerating ? 'Generating...' : 'Add with AI'}
-                        </button>
-                      </>
+                <div className="flex items-center space-x-2" ref={searchRef}>
+                  <div className="flex-1 relative">
+                    <Search className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
+                    <input
+                      type="text"
+                      placeholder="Search famous galleries like Louvre, MoMA, Tate Modern..."
+                      value={searchTerm}
+                      onChange={(e) => handleSearchTermChange(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                    {/* Nominatim Suggestions Dropdown */}
+                    {showSuggestions && (
+                      <div className="absolute top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                        {nominatimLoading ? (
+                          <div className="px-4 py-3 text-sm text-gray-500">Searching...</div>
+                        ) : (
+                          nominatimResults.map((result) => (
+                            <button
+                              key={result.place_id}
+                              onClick={() => handleSelectPlace(result)}
+                              className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                            >
+                              <div className="text-sm font-medium text-gray-900 truncate">
+                                {result.name || result.display_name.split(',')[0]}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate">{result.display_name}</div>
+                            </button>
+                          ))
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
+
+                  {showAddOption && (
+                    <>
+                      <button type="button" onClick={handleGoogleSearch} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer">
+                        <ExternalLink className="h-4 w-4 mr-2" />Search
+                      </button>
+                      <button type="button" onClick={handleAiGenerateFromPlace} disabled={aiGenerating} className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 cursor-pointer">
+                        {aiGenerating ? <div className="animate-spin rounded-full h-4 w-4 mr-2 border-b-2 border-white"></div> : <Sparkles className="h-4 w-4 mr-2" />}
+                        {aiGenerating ? 'Generating...' : 'Add with AI'}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
+              {/* Search Existing Galleries */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Search Existing Galleries</label>
                 <form onSubmit={handleSearch} className="flex items-center space-x-4">
