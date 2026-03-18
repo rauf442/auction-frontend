@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner';
 import { X, Download, Share2, Printer, Eye, Settings, Image, FileText, Grid, List, Layers } from 'lucide-react'
 import { Artwork } from '@/lib/items-api'
 import { ArtistsAPI, Artist } from '@/lib/artists-api'
@@ -116,17 +117,15 @@ export default function UnifiedCatalogGenerator({
 
   const [options, setOptions] = useState<CatalogOptions>(getDefaultOptions([], customTitle))
   const [showSettings, setShowSettings] = useState(false)
-  // const [generating, setGenerating] = useState(false)
-  // const [previewMode, setPreviewMode] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [previewMode, setPreviewMode] = useState(false)
   const [enrichedArtworks, setEnrichedArtworks] = useState<ArtworkPreviewData[]>([])
   const [loadingData, setLoadingData] = useState(true)
-  // const [loadingImages, setLoadingImages] = useState(false)
+  const [loadingImages, setLoadingImages] = useState(false)
   const [brands, setBrands] = useState<BrandData[]>([])
   const [loadedBrandLogos, setLoadedBrandLogos] = useState<Map<number, string>>(new Map())
   const [allSelectedArtworks, setAllSelectedArtworks] = useState<Artwork[]>([])
   const [loadingAllArtworks, setLoadingAllArtworks] = useState(false)
-  const [generatingAction, setGeneratingAction] = useState<'download' | 'share' | 'print' | 'preview' | null>(null)
-const [previewMode, setPreviewMode] = useState(false)
 
   // Ensure arrays are always arrays in case of minification issues
   useEffect(() => {
@@ -438,7 +437,6 @@ const [previewMode, setPreviewMode] = useState(false)
         throw new Error('Web Share API not supported');
       }
     } catch (error) {
-      if ((error as any)?.name === 'AbortError') return;
       console.error('Error sharing via Web Share API:', error);
 
       // Fallback: Force download for manual sharing
@@ -455,11 +453,11 @@ const [previewMode, setPreviewMode] = useState(false)
 
         URL.revokeObjectURL(downloadUrl);
 
-        alert(`PDF downloaded as "${fileName}". You can now attach it to emails or share it manually.`);
+        toast.success(`PDF downloaded as "${fileName}". You can now attach it to emails or share it manually.`);
         console.log('PDF download fallback completed successfully');
       } catch (downloadError) {
         console.error('Error in download fallback:', downloadError);
-        alert('Failed to download PDF. Please try again or contact support.');
+        toast.error('Failed to download PDF. Please try again or contact support.');
       }
     }
   };
@@ -467,7 +465,8 @@ const [previewMode, setPreviewMode] = useState(false)
   // Generate PDF using backend API (PDFKit)
   const generatePDFNew = async (action: 'download' | 'share' | 'print' | 'preview') => {
     try {
-      setGeneratingAction(action)
+      setGenerating(true)
+      setLoadingImages(true)
 
       // Get selected artworks - use async function if available, otherwise use prop
       let artworksToUse = safeSelectedArtworks
@@ -484,7 +483,7 @@ const [previewMode, setPreviewMode] = useState(false)
       const itemIds = artworksToUse.map(artwork => artwork.id).filter(id => id)
 
       if (itemIds.length === 0) {
-        alert('No artworks selected for PDF generation')
+        toast.warning('No artworks selected for PDF generation')
         return
       }
 
@@ -513,7 +512,7 @@ const [previewMode, setPreviewMode] = useState(false)
       // Get PDF blob from response
       const pdfBlob = await response.blob()
 
-
+      setLoadingImages(false)
 
       // Generate filename with Windows/Outlook compatible sanitization
       const sanitizeFilename = (title: string): string => {
@@ -566,9 +565,10 @@ const [previewMode, setPreviewMode] = useState(false)
 
     } catch (error: any) {
       console.error('Error generating PDF:', error)
-      alert(`Error generating PDF: ${error.message}`)
+      toast.error(`Error generating PDF: ${error.message}`)
     } finally {
-      setGeneratingAction(null)
+      setGenerating(false)
+      setLoadingImages(false)
     }
   }
 
@@ -805,38 +805,38 @@ const [previewMode, setPreviewMode] = useState(false)
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => generatePDFNew('preview')}
-              disabled={generatingAction !== null}
+              disabled={generating || loadingImages}
               className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
             >
               <Eye className="h-4 w-4 mr-2" />
-              {generatingAction === 'preview' ? 'Generating...' : 'Preview PDF'}
+              {loadingImages ? 'Loading Images...' : 'Preview PDF'}
             </button>
 
             <button
               onClick={() => generatePDFNew('download')}
-              disabled={generatingAction !== null}
+              disabled={generating || loadingImages}
               className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
             >
               <Download className="h-4 w-4 mr-2" />
-              {generatingAction === 'download' ? 'Downloading...' : 'Download PDF'}
+              {loadingImages ? 'Loading Images...' : generating ? 'Generating...' : 'Download PDF'}
             </button>
 
             <button
               onClick={() => generatePDFNew('share')}
-              disabled={generatingAction !== null}
+              disabled={generating || loadingImages}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               <Share2 className="h-4 w-4 mr-2" />
-              {generatingAction === 'share' ? 'Sharing...' : 'Share PDF'}
+              {loadingImages ? 'Loading Images...' : 'Share PDF'}
             </button>
 
             <button
               onClick={() => generatePDFNew('print')}
-              disabled={generatingAction !== null}
+              disabled={generating || loadingImages}
               className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
             >
               <Printer className="h-4 w-4 mr-2" />
-              {generatingAction === 'print' ? 'Printing...' : 'Print PDF'}
+              {loadingImages ? 'Loading Images...' : 'Print PDF'}
             </button>
           </div>
         </div>

@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { X, Package, Calculator, Save } from 'lucide-react'
 import { LogisticsInfo, InvoiceItem } from '../../types/invoice'
 import { countries } from '../../data/countries'
@@ -440,7 +441,7 @@ export default function LogisticsEditDialog({
     } catch (error) {
       console.error('Failed to save logistics:', error)
       setLoading(false)
-      alert('Failed to save logistics information')
+      toast.error('Failed to save logistics information')
     }
   }
 

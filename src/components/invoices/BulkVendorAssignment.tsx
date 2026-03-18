@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { X, User, Package, AlertCircle, UserPlus, Check, Loader2 } from 'lucide-react'
 import { useBrand } from '@/lib/brand-context'
 import SearchableSelect from '@/components/ui/SearchableSelect'
@@ -249,7 +250,7 @@ export default function BulkVendorAssignment({
         throw new Error('Some assignments failed')
       }
 
-      alert(`Successfully assigned vendors to ${selectedItems.size} item(s)`)
+      toast.success(`Successfully assigned vendors to ${selectedItems.size} item(s)`)
       onSuccess()
       onClose()
     } catch (err: any) {
@@ -547,7 +548,7 @@ export default function BulkVendorAssignment({
                   await fetchVendors()
                   setShowClientModal(false)
                   if (newClient?.id) {
-                    alert(`Client "${newClient.company_name || `${newClient.first_name} ${newClient.last_name}`}" created successfully!`)
+                    toast.success(`Client "${newClient.company_name || `${newClient.first_name} ${newClient.last_name}`}" created successfully!`)
                   }
                 }}
               />

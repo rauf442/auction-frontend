@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import ConsignmentsTable from '@/components/consignments/ConsignmentsTable'
 import CSVUpload from '@/components/consignments/CSVUpload'
@@ -205,7 +206,7 @@ export default function ConsignmentsPage() {
         fetchConsignments(newPage, activeStatus, activeSearch)
       } catch (error) {
         console.error('Error deleting consignment:', error)
-        alert('Failed to delete consignment')
+        toast.error('Failed to delete consignment')
       }
     }
   }
@@ -214,7 +215,7 @@ export default function ConsignmentsPage() {
 
   const handleGenerateReportPDF = () => {
     if (selectedConsignments.length === 0) {
-      alert('Please select at least one consignment to generate a PDF report')
+      toast.warning('Please select at least one consignment to generate a PDF report')
       return
     }
     setShowPDFGenerator(true)

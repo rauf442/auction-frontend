@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';  // ← STEP 1: ADD IMPORT
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -58,7 +59,7 @@ export default function InstagramCredentialsDialog({
     try {
       setBrandsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/brands`, {
+      const response = await fetch('http://localhost:3001/api/brands', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -85,7 +86,7 @@ export default function InstagramCredentialsDialog({
       setLoading(true);
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/instagram/credentials/${brandId}`,
+        `http://localhost:3001/api/social-media/instagram/credentials/${brandId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -131,7 +132,7 @@ export default function InstagramCredentialsDialog({
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/instagram/credentials`,
+        'http://localhost:3001/api/social-media/instagram/credentials',
         {
           method: 'POST',
           headers: {
@@ -149,15 +150,15 @@ export default function InstagramCredentialsDialog({
       );
 
       if (response.ok) {
-        alert('Instagram credentials saved successfully!');
+        toast.success('Instagram credentials saved successfully!');  // ← STEP 2: SUCCESS
         onOpenChange(false);
       } else {
         const error = await response.json();
-        alert(`Failed to save credentials: ${error.error}`);
+        toast.error(`Failed to save credentials: ${error.error}`);  // ← STEP 3: ERROR
       }
     } catch (error) {
       console.error('Error saving credentials:', error);
-      alert('Error saving credentials');
+      toast.error('Error saving credentials');  // ← STEP 3: ERROR
     } finally {
       setSaving(false);
     }
@@ -322,4 +323,3 @@ export default function InstagramCredentialsDialog({
     </Dialog>
   );
 }
-

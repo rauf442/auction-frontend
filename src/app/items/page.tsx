@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Plus, Download, Upload, Filter, MoreVertical, Eye, Sparkles, RefreshCw, FileText, Share2, Printer, Check, Trophy, Trash2, Search, ChevronDown, Copy } from 'lucide-react'
 import { Artwork, ArtworksAPI, ArtworksResponse } from '@/lib/items-api'
@@ -350,7 +351,7 @@ export default function ItemsPage() {
       // Reload items to show the new artwork
       await loadItems()
       
-      alert(`AI-generated artwork saved successfully to ${targetBrand}!`)
+      toast.success(`AI-generated artwork saved successfully to ${targetBrand}!`)
     } catch (err: any) {
       console.error('Failed to save AI-generated artwork:', err)
       setError(err.message || 'Failed to save AI-generated artwork')
@@ -363,12 +364,12 @@ export default function ItemsPage() {
     setShowAIBulkModal(false)
     // Reload items to show the new artworks
     loadItems()
-    alert(`Successfully generated and saved ${results.length} artworks!`)
+    toast.success(`Successfully generated and saved ${results.length} artworks!`)
   }
 
   const handlePDFAction = (action: 'generate' | 'share' | 'print') => {
     if (selectedItems.length === 0) {
-      alert('Please select artworks first')
+      toast.warning('Please select artworks first')
       return
     }
     setShowPDFGenerator(true)
@@ -451,10 +452,10 @@ export default function ItemsPage() {
           // Fallback to clipboard copy
           try {
             await navigator.clipboard.writeText(url)
-            alert(`Link copied to clipboard: ${url}`)
+            toast.success(`Link copied to clipboard: ${url}`)
           } catch (clipboardError) {
             console.error('Clipboard copy failed:', clipboardError)
-            alert(`Share failed. URL: ${url}`)
+            toast.error(`Share failed. URL: ${url}`)
           }
         }
         // If it's AbortError (user canceled), we silently continue
@@ -462,10 +463,10 @@ export default function ItemsPage() {
     } else {
       try {
         await navigator.clipboard.writeText(url)
-        alert(`Link copied to clipboard: ${url}`)
+        toast.success(`Link copied to clipboard: ${url}`)
       } catch (error) {
         console.error('Clipboard copy failed:', error)
-        alert(`Share failed. URL: ${url}`)
+        toast.error(`Share failed. URL: ${url}`)
       }
     }
     setShowPublicFormDropdown(false)

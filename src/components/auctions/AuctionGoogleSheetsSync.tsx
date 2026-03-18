@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { X, RefreshCw, Globe, Save, AlertCircle, CheckCircle, Upload, Download, Settings, Zap, Clock, Play, Square, Activity, Timer, Radio } from 'lucide-react'
 import { useBrand } from '@/lib/brand-context'
 import { getGoogleSheetsUrlForModule, updateGoogleSheetsUrl } from '@/lib/app-settings-api'
@@ -563,9 +564,9 @@ export default function AuctionGoogleSheetsSync({
                 testBackendConnectivity().then(result => {
                   console.log('🧪 Backend connectivity test:', result)
                   if (result.success) {
-                    alert('✅ Backend connection successful!')
+                    toast.success('✅ Backend connection successful!')
                   } else {
-                    alert(`❌ Backend connection failed: ${result.message}`)
+                    toast.error(`❌ Backend connection failed: ${result.message}`)
                   }
                 })
               })
@@ -584,9 +585,9 @@ export default function AuctionGoogleSheetsSync({
               console.log('🔑 Token value:', token ? token.substring(0, 20) + '...' : 'null')
 
               if (!token) {
-                alert('❌ No authentication token found. Please log in first.')
+                toast.error('❌ No authentication token found. Please log in first.')
               } else {
-                alert('✅ Authentication token found. Token looks valid.')
+                toast.success('✅ Authentication token found. Token looks valid.')
               }
             }}
             className="px-3 py-2 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700 flex items-center"
@@ -602,9 +603,9 @@ export default function AuctionGoogleSheetsSync({
                 debugSyncManager().then(result => {
                   console.log('🔧 Sync manager debug:', result)
                   if (result.success) {
-                    alert('✅ Sync manager working!')
+                    toast.success('✅ Sync manager working!')
                   } else {
-                    alert(`❌ Sync manager issue: ${result.message}`)
+                    toast.error(`❌ Sync manager issue: ${result.message}`)
                   }
                 })
               })
@@ -622,13 +623,13 @@ export default function AuctionGoogleSheetsSync({
                 getSyncStatusNoAuth().then(result => {
                   console.log('🔧 Sync manager (no auth):', result)
                   if (result.success) {
-                    alert('✅ Sync manager working (no auth)!')
+                    toast.success('✅ Sync manager working (no auth)!')
                   } else {
-                    alert(`❌ Sync manager issue: ${JSON.stringify(result)}`)
+                    toast.error(`❌ Sync manager issue: ${JSON.stringify(result)}`)
                   }
                 }).catch(error => {
                   console.error('🔧 Sync manager (no auth) error:', error)
-                  alert(`❌ Sync manager error: ${error.message}`)
+                  toast.error(`❌ Sync manager error: ${error.message}`)
                 })
               })
             }}

@@ -2,6 +2,8 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
+
 import { ExternalLink, Share2, ArrowLeft, FileText, Plus, Edit, Trash2, Eye } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -128,14 +130,14 @@ export default function WebsiteManagement({
 
       const data = await response.json()
       if (data.success) {
-        alert('Article deleted successfully')
+        toast.success('Article deleted successfully')
         loadArticles()
       } else {
-        alert(data.message || 'Failed to delete article')
+        toast.error(data.message || 'Failed to delete article')
       }
     } catch (err: any) {
       console.error('Error deleting article:', err)
-      alert('Failed to delete article: ' + err.message)
+      toast.error('Failed to delete article: ' + err.message)
     }
   }
 
@@ -182,10 +184,10 @@ export default function WebsiteManagement({
           // Fallback to clipboard copy
           try {
             await navigator.clipboard.writeText(url)
-            alert(`Link copied to clipboard: ${url}`)
+            toast.success(`Link copied to clipboard: ${url}`)
           } catch (clipboardError) {
             console.error('Clipboard copy failed:', clipboardError)
-            alert(`Share failed. URL: ${url}`)
+            toast.error(`Share failed. URL: ${url}`)
           }
         }
         // If it's AbortError (user canceled), we silently continue
@@ -193,10 +195,10 @@ export default function WebsiteManagement({
     } else {
       try {
         await navigator.clipboard.writeText(url)
-        alert(`Link copied to clipboard: ${url}`)
+        toast.success(`Link copied to clipboard: ${url}`)
       } catch (clipboardError) {
         console.error('Clipboard copy failed:', clipboardError)
-        alert(`Share failed. URL: ${url}`)
+        toast.error(`Share failed. URL: ${url}`)
       }
     }
   }

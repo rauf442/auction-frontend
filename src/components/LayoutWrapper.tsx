@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 import AuthGuard from './AuthGuard'
 import FloatingChat from './FloatingChat'
+import { Toaster } from 'sonner'
 
 interface LayoutWrapperProps {
   children: React.ReactNode
@@ -32,15 +33,16 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
     <AuthGuard>
       <div className="layout-wrapper">
-        <Sidebar />
-        <div className="flex-1 flex flex-col min-h-screen">
-          <Header />
-          <main className="flex-1 bg-gray-50 overflow-auto">
-            {children}
-          </main>
-        </div>
+  <Sidebar />
+  <div className="flex-1 flex flex-col min-h-screen min-w-0 overflow-hidden">
+    <Header />
+    <main className="flex-1 bg-gray-50 overflow-auto">
+      {children}
+    </main>
+  </div>
         {/* Floating Chat Widget - Available on all authenticated pages */}
         <FloatingChat />
+        <Toaster position="top-right" richColors />
       </div>
     </AuthGuard>
   )

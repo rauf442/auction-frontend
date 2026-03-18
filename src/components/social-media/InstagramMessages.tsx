@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';  // ← STEP 1: ADD IMPORT
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -129,7 +130,7 @@ export default function InstagramMessages() {
       });
 
       if (response.ok) {
-        alert('Message queued successfully!');
+        toast.success('Message queued successfully!');  // ← STEP 2: SUCCESS TOAST
         setFormData({
           brand_id: '',
           instagram_username: '',
@@ -138,11 +139,11 @@ export default function InstagramMessages() {
         fetchMessages();
       } else {
         const error = await response.json();
-        alert(`Failed to send message: ${error.error}`);
+        toast.error(`Failed to send message: ${error.error}`);  // ← STEP 3: ERROR TOAST
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Error sending message');
+      toast.error('Error sending message');  // ← STEP 3: ERROR TOAST
     } finally {
       setSending(false);
     }
@@ -359,4 +360,3 @@ export default function InstagramMessages() {
     </div>
   );
 }
-

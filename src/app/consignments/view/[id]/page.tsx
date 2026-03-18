@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -196,7 +197,7 @@ export default function ConsignmentViewPage() {
       navigator.share(shareData)
     } else {
       navigator.clipboard?.writeText(window.location.href)
-      alert('Link copied to clipboard')
+      toast.success('Link copied to clipboard')
     }
   }
 

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from 'react'
+import { toast } from 'sonner'
 import { getBrandDetails, BrandCode } from '@/lib/brand-context'
 import SignatureModal from '@/components/consignments/SignatureModal'
 
@@ -150,7 +151,7 @@ const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       }
     } catch (error) {
       console.error('Error generating PDF:', error)
-      alert('Error generating PDF. Please try again.')
+      toast.error('Error generating PDF. Please try again.')
     } finally {
       setIsGenerating(false)
     }
@@ -181,7 +182,7 @@ const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       await generatePDF()
     } catch (error: any) {
       console.error('Error saving signature:', error)
-      alert('Error saving signature: ' + (error.message || 'Please try again.'))
+      toast.error('Error saving signature: ' + (error.message || 'Please try again.'))
     } finally {
       setIsSavingSignature(false)
     }

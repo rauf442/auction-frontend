@@ -2,6 +2,8 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { toast } from 'sonner'
+
 import { createConsignment, updateConsignment } from '@/lib/consignments-api'
 import { fetchClients, searchClients, type Client, createClient } from '@/lib/clients-api'
 import { ArtworksAPI } from '@/lib/items-api'
@@ -314,7 +316,7 @@ export default function ConsignmentForm({ consignment, onSave, onCancel }: Consi
     
     // Validate required fields
     if (!formData.client_id || formData.client_id === 0) {
-      alert('Please select a client. Client selection is required.')
+      toast.warning('Please select a client. Client selection is required.')
       return
     }
     

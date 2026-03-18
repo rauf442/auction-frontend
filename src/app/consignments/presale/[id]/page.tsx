@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useParams, useRouter } from 'next/navigation'
 import { getPresaleOptions, PresaleOptionsResponse, PresaleOption } from '@/lib/consignments-api'
 import { generateAuctionPreSaleInvoicePDF } from '@/lib/consignment-pdf-api'
@@ -55,7 +56,7 @@ export default function PresaleOptionsPage() {
       await generateAuctionPreSaleInvoicePDF(consignmentId, option.auction_id, saleDetails)
     } catch (err: any) {
       console.error('Error generating PDF:', err)
-      alert('Error generating PDF. Please try again.')
+      toast.error('Error generating PDF. Please try again.')
     } finally {
       setGenerating(null)
     }

@@ -383,7 +383,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           <StatStack
             title="Value overview"
             items={[
@@ -410,7 +410,7 @@ export default function DashboardPage() {
           />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Total revenue</p>
             <p className="mt-3 text-3xl font-semibold text-slate-900">{formatCurrency(stats.revenue.totalRevenue)}</p>
@@ -469,10 +469,10 @@ function StatStack({ title, items }: StatStackProps) {
       <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{title}</p>
       <div className="mt-4 space-y-3">
         {items.map((item) => (
-          <div key={item.label} className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">{item.label}</span>
-            <span className="font-semibold text-slate-900">{item.value}</span>
-          </div>
+          <div key={item.label} className="flex items-center justify-between gap-2 text-sm">
+  <span className="text-slate-500 truncate">{item.label}</span>
+  <span className="font-semibold text-slate-900 shrink-0">{item.value}</span>
+</div>
         ))}
       </div>
     </div>
@@ -492,10 +492,10 @@ function TopList({ title, items, emptyLabel }: TopListProps) {
       {items.length > 0 ? (
         <div className="mt-4 space-y-3 text-sm">
           {items.map((item) => (
-            <div key={`${title}-${item.name}`} className="flex items-center justify-between text-slate-600">
-              <span className="text-slate-900">{item.name}</span>
-              <span className="font-semibold text-slate-900">{item.value}</span>
-            </div>
+            <div key={`${title}-${item.name}`} className="flex items-center justify-between gap-2 text-slate-600">
+  <span className="text-slate-900 truncate">{item.name}</span>
+  <span className="font-semibold text-slate-900 shrink-0">{item.value}</span>
+</div>
           ))}
         </div>
       ) : (

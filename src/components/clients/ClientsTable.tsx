@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import {
   fetchClients,
@@ -142,6 +143,21 @@ export default function ClientsTable({
   // Brand filter (quick scope)
   const [brands, setBrands] = useState<Brand[]>([])
   const [brandCode, setBrandCode] = useState<string>('ALL')
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
+const brandDropdownRef = useRef<HTMLDivElement>(null)
+
+useEffect(() => {
+  const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setBrandDropdownOpen(false) }
+  const handleClick = (e: MouseEvent) => {
+    if (brandDropdownRef.current && !brandDropdownRef.current.contains(e.target as Node)) setBrandDropdownOpen(false)
+  }
+  document.addEventListener('keydown', handleKey)
+  document.addEventListener('mousedown', handleClick)
+  return () => {
+    document.removeEventListener('keydown', handleKey)
+    document.removeEventListener('mousedown', handleClick)
+  }
+}, [])
 
   useEffect(() => {
     (async () => {
@@ -324,19 +340,56 @@ export default function ClientsTable({
         <div className="text-sm text-gray-600">
           {clients.length} result{clients.length === 1 ? '' : 's'}
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Brand</label>
-          <select
-            value={brandCode}
-            onChange={(e)=> setBrandCode(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white"
+        <div className="flex items-center gap-2 relative" ref={brandDropdownRef}>
+  <label className="text-sm text-gray-600">Brand</label>
+  <div
+    className={`flex items-center justify-between gap-2 px-3 py-1.5 border rounded-md text-sm bg-white cursor-pointer min-w-[140px] ${brandCode !== 'ALL' ? 'border-teal-500 bg-teal-50' : 'border-gray-300'}`}
+    onClick={() => setBrandDropdownOpen(!brandDropdownOpen)}
+  >
+    <span className={`truncate ${brandCode !== 'ALL' ? 'text-teal-700 font-medium' : 'text-gray-700'}`}>
+      {brandCode === 'ALL' ? 'All Brands' : brands.find(b => b.code === brandCode)?.name || brandCode}
+    </span>
+    <div className="flex items-center gap-1 shrink-0">
+      {brandCode !== 'ALL' && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setBrandCode('ALL') }}
+          className="p-0.5 rounded-full hover:bg-teal-200 text-teal-600"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${brandDropdownOpen ? 'rotate-180' : ''}`} />
+    </div>
+  </div>
+
+  {brandDropdownOpen && (
+    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</span>
+        <button onClick={() => setBrandDropdownOpen(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="py-1 max-h-48 overflow-y-auto">
+        <button
+          onClick={() => { setBrandCode('ALL'); setBrandDropdownOpen(false) }}
+          className={`w-full text-left px-3 py-2 text-sm hover:bg-teal-50 hover:text-teal-700 ${brandCode === 'ALL' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700'}`}
+        >
+          All Brands
+        </button>
+        {brands.map(b => (
+          <button
+            key={b.id}
+            onClick={() => { setBrandCode(b.code); setBrandDropdownOpen(false) }}
+            className={`w-full text-left px-3 py-2 text-sm hover:bg-teal-50 hover:text-teal-700 ${brandCode === b.code ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700'}`}
           >
-            <option value="ALL">All Brands</option>
-            {brands.map(b => (
-              <option key={b.id} value={b.code}>{b.name} ({b.code})</option>
-            ))}
-          </select>
-        </div>
+            {b.name} ({b.code})
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
       </div>
       {/* Bulk Actions Bar */}
       {selectedClients.length > 0 && (

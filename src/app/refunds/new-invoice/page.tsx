@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -126,7 +127,7 @@ export default function NewInvoiceRefundPage() {
     e.preventDefault()
     
     if (!selectedInvoice) {
-      alert('Please select an invoice')
+      toast.warning('Please select an invoice')
       return
     }
 
@@ -154,7 +155,7 @@ export default function NewInvoiceRefundPage() {
       router.push('/refunds')
     } catch (error) {
       console.error('Error creating refund:', error)
-      alert('Failed to create refund. Please try again.')
+      toast.error('Failed to create refund. Please try again.')
     } finally {
       setLoading(false)
     }

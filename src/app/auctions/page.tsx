@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import AuctionsTable from '@/components/auctions/AuctionsTable'
 import CSVUpload from '@/components/auctions/CSVUpload'
@@ -359,7 +360,7 @@ export default function AuctionsPage() {
 
   const handleGeneratePassedAuctionBulk = () => {
     if (selectedAuctions.length === 0) {
-      alert('Please select at least one auction')
+      toast.warning('Please select at least one auction')
       return
     }
 

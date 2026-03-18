@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react'
+import { toast } from 'sonner'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, Save, X, Upload, Trash2, Plus, Sparkles } from 'lucide-react'
 import { Artwork, ArtworksAPI, validateArtworkData, generateStartPrice, generateReservePriceForAI, ITEM_CATEGORIES, ITEM_PERIODS, ITEM_MATERIALS, ITEM_CONDITIONS } from '@/lib/items-api'
@@ -980,23 +981,23 @@ export default function ItemForm({ itemId, initialData, mode, onSave, onCancel }
     const filesToProcess = Array.from(files).slice(0, availableSlots.length)
 
     if (filesToProcess.length === 0) {
-      alert('All image slots are already filled. Please remove some images first.')
+      toast.warning('All image slots are already filled. Please remove some images first.')
       return
     }
 
     if (filesToProcess.length < files.length) {
-      alert(`Only ${filesToProcess.length} files can be added (remaining slots available)`)
+      toast.warning(`Only ${filesToProcess.length} files can be added (remaining slots available)`)
     }
 
     filesToProcess.forEach((file, index) => {
       // Validate file type and size
       if (!file.type.startsWith('image/')) {
-        alert(`File ${file.name} is not an image`)
+        toast.error(`File ${file.name} is not an image`)
         return
       }
 
       if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        alert(`File ${file.name} is too large (max 10MB)`)
+        toast.error(`File ${file.name} is too large (max 10MB)`)
         return
       }
 
@@ -1080,7 +1081,7 @@ export default function ItemForm({ itemId, initialData, mode, onSave, onCancel }
     })
 
     console.log('Applied AI suggestions:', selectedFields)
-    alert(`Applied ${Object.keys(selectedFields).length} AI suggestions to the form.`)
+    toast.success(`Applied ${Object.keys(selectedFields).length} AI suggestions to the form.`)
   }
 
   // Get count of filled image slots

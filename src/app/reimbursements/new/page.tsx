@@ -2,6 +2,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,7 +74,7 @@ export default function NewReimbursementPage() {
       router.push('/reimbursements')
     } catch (error) {
       console.error('Error creating reimbursement:', error)
-      alert('Error creating reimbursement: ' + (error as Error).message)
+      toast.error('Error creating reimbursement: ' + (error as Error).message)
     } finally {
       setLoading(false)
     }

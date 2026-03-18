@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import Link from 'next/link'
 import { Plus, Download, AlertCircle, Upload, RefreshCw } from 'lucide-react'
 import ClientsFilter from '@/components/clients/ClientsFilter'
@@ -86,7 +87,7 @@ export default function ClientsPage() {
   const syncWithGoogleSheet = async (autoSync = false, customUrl?: string, selectedBrandCode?: string) => {
     const urlToUse = customUrl || googleSheetUrl
     if (!urlToUse) {
-      if (!autoSync) alert('No Google Sheets URL configured for this brand. Please configure it in Settings > Brands.')
+      if (!autoSync) toast.warning('No Google Sheets URL configured for this brand. Please configure it in Settings > Brands.')
       return
     }
 
@@ -120,14 +121,14 @@ export default function ClientsPage() {
 ${brandForEmptyFields ? `\n• Used '${brandForEmptyFields}' for empty brand fields` : ''}
 
 ${errors.length > 0 ? '\nFirst few errors:\n' + errors.slice(0, 3).join('\n') : ''}`;
-        alert(message);
+        toast.error(message);
       }
       
       return result
     } catch (error: any) {
       console.error('Google Sheets sync error:', error)
       if (!autoSync) {
-        alert(error.message || 'Sync failed')
+        toast.error(error.message || 'Sync failed')
       }
       throw error
     } finally {
@@ -189,15 +190,15 @@ ${errors.length > 0 ? '\nFirst few errors:\n' + errors.slice(0, 3).join('\n') : 
       if (success) {
         // Reload the Google Sheets URL for current brand
         await loadGoogleSheetUrl()
-        alert('Google Sheets URL saved successfully!')
+        toast.success('Google Sheets URL saved successfully!')
         return true
       } else {
-        alert('Failed to save Google Sheets URL')
+        toast.error('Failed to save Google Sheets URL')
         return false
       }
     } catch (error) {
       console.error('Error saving Google Sheets URL:', error)
-      alert('Failed to save Google Sheets URL')
+      toast.error('Failed to save Google Sheets URL')
       return false
     }
   }
@@ -205,7 +206,7 @@ ${errors.length > 0 ? '\nFirst few errors:\n' + errors.slice(0, 3).join('\n') : 
   // Handle brand selection for sync
   const handleBrandSync = async () => {
     if (!selectedBrandForSync) {
-      alert('Please select a brand')
+      toast.warning('Please select a brand')
       return
     }
 
@@ -227,7 +228,7 @@ ${errors.length > 0 ? '\nFirst few errors:\n' + errors.slice(0, 3).join('\n') : 
       }
     } catch (error) {
       console.error('Error loading brand settings:', error)
-      alert('Failed to load brand settings')
+      toast.error('Failed to load brand settings')
     }
   }
 
@@ -671,7 +672,7 @@ ${errors.length > 0 ? '\nFirst few errors:\n' + errors.slice(0, 3).join('\n') : 
               <button
                 onClick={async () => {
                   if (!editingSheetUrl) {
-                    alert('Please enter a valid URL')
+                    toast.warning('Please enter a valid URL')
                     return
                   }
 

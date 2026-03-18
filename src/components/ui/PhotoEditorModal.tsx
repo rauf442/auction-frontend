@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useCallback } from 'react'
+import { toast } from 'sonner';
 import { X, RotateCcw, RotateCw, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react'
 import Cropper, { Point, Area } from 'react-easy-crop'
 
@@ -112,7 +113,7 @@ export default function PhotoEditorModal({ imageUrl, onSave, onClose }: PhotoEdi
       onSave(blob, url)
     } catch (error) {
       console.error('Error cropping image:', error)
-      alert('Failed to crop image. Please try again.')
+      toast.error('Failed to crop image. Please try again.')
     } finally {
       setSaving(false)
     }

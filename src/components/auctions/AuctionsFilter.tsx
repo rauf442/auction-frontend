@@ -1,8 +1,8 @@
 // frontend/src/components/auctions/AuctionsFilter.tsx
 "use client"
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { Search, Filter, X, Calendar } from 'lucide-react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { Search, Filter, X, Calendar, ChevronDown } from 'lucide-react'
 import SearchableSelect from '@/components/ui/SearchableSelect'
 import { getAuctions } from '@/lib/auctions-api'
 import { getBrands, type Brand } from '@/lib/brands-api'
@@ -49,11 +49,71 @@ const dateRanges = [
   { value: 'custom', label: 'Custom Range' }
 ]
 
-// Interface for auction suggestion
 interface AuctionSuggestion {
   value: string
   label: string
   description: string
+}
+
+function CustomDropdown({ label, value, options, onChange, defaultValue }: {
+  label: string; value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+  defaultValue: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const selectedLabel = options.find(o => o.value === value)?.label || options[0]?.label
+  const isFiltered = value !== defaultValue
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false) }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setIsOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => { document.removeEventListener('keydown', handleKeyDown); document.removeEventListener('mousedown', handleClickOutside) }
+  }, [])
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      {label && <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>}
+      <div
+        className={`flex items-center justify-between w-full px-3 py-2 border rounded-lg cursor-pointer bg-white ${isFiltered ? 'border-teal-500 bg-teal-50' : 'border-gray-300'}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className={`text-sm truncate ${isFiltered ? 'text-teal-700 font-medium' : 'text-gray-700'}`}>{selectedLabel}</span>
+        <div className="flex items-center gap-1 ml-2 shrink-0">
+          {isFiltered && (
+            <button onClick={(e) => { e.stopPropagation(); onChange(defaultValue); setIsOpen(false) }}
+              className="p-0.5 rounded-full hover:bg-teal-200 text-teal-600" title="Clear">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
+            <button onClick={() => setIsOpen(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="py-1 max-h-48 overflow-y-auto">
+            {options.map((option) => (
+              <button key={option.value} onClick={() => { onChange(option.value); setIsOpen(false) }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-teal-50 hover:text-teal-700 ${value === option.value ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700'}`}>
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function AuctionsFilter({ filters, onFilterChange, statusCounts }: AuctionsFilterProps) {
@@ -65,34 +125,25 @@ export default function AuctionsFilter({ filters, onFilterChange, statusCounts }
   const [loadingAuctions, setLoadingAuctions] = useState(false)
   const [brands, setBrands] = useState<Brand[]>([])
 
-  // Get brand ID from brand code - memoized to prevent infinite useEffect loops
-  // Handle "ALL" as no brand filter
   const getBrandId = useCallback((brandCode: string): number | null | undefined => {
-    if (brandCode === 'ALL') {
-      return null; // No brand filter - all brands eligible
-    }
+    if (brandCode === 'ALL') return null
     const foundBrand = brands.find(b => b.code === brandCode)
     return foundBrand?.id
   }, [brands])
 
   useEffect(() => {
-    // Load specialists/users and auction suggestions
     loadSpecialists()
     loadBrands()
   }, [])
 
   useEffect(() => {
-    if (brands.length > 0) {
-      loadAuctionSuggestions()
-    }
+    if (brands.length > 0) loadAuctionSuggestions()
   }, [brand, brands, getBrandId])
 
   const loadBrands = async () => {
     try {
       const response = await getBrands()
-      if (response.success) {
-        setBrands(response.data)
-      }
+      if (response.success) setBrands(response.data)
     } catch (error) {
       console.error('Error loading brands:', error)
     }
@@ -102,19 +153,15 @@ export default function AuctionsFilter({ filters, onFilterChange, statusCounts }
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/users`, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : ''
-        }
+        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       })
-
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
-          const formattedSpecialists = data.data.map((user: any) => ({
+          setSpecialists(data.data.map((user: any) => ({
             id: user.id,
             name: `${user.first_name} ${user.last_name}`.trim() || user.email
-          }))
-          setSpecialists(formattedSpecialists)
+          })))
         }
       }
     } catch (error) {
@@ -130,47 +177,22 @@ export default function AuctionsFilter({ filters, onFilterChange, statusCounts }
         limit: 100,
         sort_field: 'created_at',
         sort_direction: 'desc',
-        ...(brandId !== null && { brand_id: brandId }) // Only include brand_id if not null (ALL brands)
+        ...(brandId !== null && { brand_id: brandId })
       })
-
-      // Create suggestions from real auctions
-      const suggestions: AuctionSuggestion[] = [
-        { value: '', label: 'All Auctions', description: 'Show all auctions' }
-      ]
-
+      const suggestions: AuctionSuggestion[] = [{ value: '', label: 'All Auctions', description: 'Show all auctions' }]
       response.auctions.map(auction => suggestions.push({
         value: auction.id.toString(),
         label: `${auction.short_name} - ${auction.long_name}`,
         description: `${auction.short_name} ${auction.long_name} ${auction.description || ''}`.toLowerCase()
       }))
-
-      // Remove duplicates based on value
-      const uniqueSuggestions = suggestions.filter((suggestion, index, self) =>
-        index === self.findIndex(s => s.value === suggestion.value)
-      )
-
+      const uniqueSuggestions = suggestions.filter((s, i, self) => i === self.findIndex(x => x.value === s.value))
       setAuctionSuggestions(uniqueSuggestions)
     } catch (error) {
       console.error('Error loading auction suggestions:', error)
-      // Fallback to empty suggestions
-      setAuctionSuggestions([
-        { value: '', label: 'All Auctions', description: 'Show all auctions' }
-      ])
+      setAuctionSuggestions([{ value: '', label: 'All Auctions', description: 'Show all auctions' }])
     } finally {
       setLoadingAuctions(false)
     }
-  }
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    setSearchTerm(value)
-
-    // Debounce the search
-    const timeoutId = setTimeout(() => {
-      onFilterChange({ search: value })
-    }, 300)
-
-    return () => clearTimeout(timeoutId)
   }
 
   const handleFilterChange = (key: keyof FilterState, value: string) => {
@@ -179,13 +201,7 @@ export default function AuctionsFilter({ filters, onFilterChange, statusCounts }
 
   const clearAllFilters = () => {
     setSearchTerm('')
-    onFilterChange({
-      status: 'all',
-      type: 'all',
-      search: '',
-      specialist: 'all',
-      dateRange: 'all'
-    })
+    onFilterChange({ status: 'all', type: 'all', search: '', specialist: 'all', dateRange: 'all' })
   }
 
   const getActiveFiltersCount = () => {
@@ -198,12 +214,16 @@ export default function AuctionsFilter({ filters, onFilterChange, statusCounts }
     return count
   }
 
+  const specialistOptions = [
+    { value: 'all', label: 'All Specialists' },
+    ...specialists.map(s => ({ value: s.id, label: s.name }))
+  ]
+
   return (
     <div className="bg-white border-b border-gray-200">
       {/* Header Row with Search and Toggle */}
       <div className="px-6 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-4 flex-1">
-          {/* Search Bar */}
           <div className="flex-1 max-w-md">
             <SearchableSelect
               value={filters.search}
@@ -222,32 +242,22 @@ export default function AuctionsFilter({ filters, onFilterChange, statusCounts }
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* Active Filters Count */}
           {getActiveFiltersCount() > 0 && (
             <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
               {getActiveFiltersCount()} filter{getActiveFiltersCount() !== 1 ? 's' : ''}
             </span>
           )}
-
-          {/* Clear Filters Button */}
           {getActiveFiltersCount() > 0 && (
-            <button
-              onClick={clearAllFilters}
-              className="text-sm text-gray-500 hover:text-gray-700 underline cursor-pointer"
-            >
+            <button onClick={clearAllFilters} className="text-sm text-gray-500 hover:text-gray-700 underline cursor-pointer">
               Clear all
             </button>
           )}
-
-          {/* Toggle Filters Button */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
           >
             <Filter className="h-4 w-4" />
-            <span className="text-sm">
-              {isExpanded ? 'Hide Filters' : 'More Filters'}
-            </span>
+            <span className="text-sm">{isExpanded ? 'Hide Filters' : 'More Filters'}</span>
           </button>
         </div>
       </div>
@@ -259,16 +269,11 @@ export default function AuctionsFilter({ filters, onFilterChange, statusCounts }
             <button
               key={status.value}
               onClick={() => handleFilterChange('status', status.value)}
-              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer ${filters.status === status.value
-                  ? status.color
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer ${filters.status === status.value ? status.color : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
               {status.label}
               {statusCounts && status.value !== 'all' && (
-                <span className="ml-1 text-xs opacity-75">
-                  ({statusCounts[status.value as keyof typeof statusCounts] || 0})
-                </span>
+                <span className="ml-1 text-xs opacity-75">({statusCounts[status.value as keyof typeof statusCounts] || 0})</span>
               )}
             </button>
           ))}
@@ -280,68 +285,40 @@ export default function AuctionsFilter({ filters, onFilterChange, statusCounts }
         <div className="px-6 pb-4 border-t border-gray-100">
           <div className="pt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
-            {/* Auction Type Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Auction Type
-              </label>
-              <select
-                value={filters.type}
-                onChange={(e) => handleFilterChange('type', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {auctionTypes.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Auction Type"
+              value={filters.type}
+              options={auctionTypes}
+              onChange={(val) => handleFilterChange('type', val)}
+              defaultValue="all"
+            />
 
-            {/* Specialist Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Specialist
-              </label>
-              <select
-                value={filters.specialist}
-                onChange={(e) => handleFilterChange('specialist', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">All Specialists</option>
-                {specialists.map((specialist) => (
-                  <option key={specialist.id} value={specialist.id}>
-                    {specialist.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Specialist"
+              value={filters.specialist}
+              options={specialistOptions}
+              onChange={(val) => handleFilterChange('specialist', val)}
+              defaultValue="all"
+            />
 
-            {/* Date Range Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Calendar className="h-4 w-4 inline mr-1" />
                 Date Range
               </label>
-              <select
+              <CustomDropdown
+                label=""
                 value={filters.dateRange}
-                onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {dateRanges.map((range) => (
-                  <option key={range.value} value={range.value}>
-                    {range.label}
-                  </option>
-                ))}
-              </select>
+                options={dateRanges}
+                onChange={(val) => handleFilterChange('dateRange', val)}
+                defaultValue="all"
+              />
             </div>
 
             {/* Quick Actions */}
             <div className="flex items-end">
               <div className="w-full space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Quick Actions
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Quick Actions</label>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleFilterChange('status', 'in_progress')}

@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { FileText, Import, Download, Users, Filter, RefreshCw } from 'lucide-react'
 import { getAuctions, getAuctionInvoices, exportEOACsv, type Auction, type Invoice } from '@/lib/auctions-api'
 import { getBrands, type Brand } from '@/lib/brands-api'
@@ -200,7 +201,7 @@ export default function InvoicesPage() {
 
   const handleImportEOA = () => {
     if (!state.selectedAuctionId) {
-      alert('Please select an auction first')
+      toast.warning('Please select an auction first')
       return
     }
     setState(prev => ({ ...prev, showEOADialog: true }))
@@ -208,7 +209,7 @@ export default function InvoicesPage() {
 
   const handleExportEOA = async () => {
     if (!state.selectedAuctionId) {
-      alert('Please select an auction first')
+      toast.warning('Please select an auction first')
       return
     }
 
@@ -226,7 +227,7 @@ export default function InvoicesPage() {
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Failed to export EOA CSV:', error)
-      alert('Failed to export CSV. Please try again.')
+      toast.error('Failed to export CSV. Please try again.')
     }
   }
 

@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -131,7 +132,7 @@ export default function InstagramPosts() {
 
     const hasCredentials = credentialsStatus[post.brand_id || 0];
     if (!hasCredentials) {
-      alert('Instagram credentials are not configured for this brand. Please configure them first.');
+      toast.warning('Instagram credentials are not configured for this brand. Please configure them first.');
       setCredentialsOpen(true);
       return;
     }
@@ -153,25 +154,25 @@ export default function InstagramPosts() {
       );
 
       if (response.ok) {
-        alert('Post published successfully to Instagram!');
+        toast.success('Post published successfully to Instagram!');
         fetchPosts();
         checkCredentialsStatus();
       } else {
         const error = await response.json();
 
         if (error.error?.includes('credentials not configured')) {
-          alert('Instagram credentials are not configured. Please set them up first.');
+          toast.warning('Instagram credentials are not configured. Please set them up first.');
           setCredentialsOpen(true);
         } else if (error.error?.includes('token has expired')) {
-          alert('Instagram access token has expired. Please update your credentials.');
+          toast.error('Instagram access token has expired. Please update your credentials.');
           setCredentialsOpen(true);
         } else {
-          alert(`Failed to publish: ${error.error || 'Unknown error'}`);
+          toast.error(`Failed to publish: ${error.error || 'Unknown error'}`);
         }
       }
     } catch (error) {
       console.error('Error publishing post:', error);
-      alert('Network error while publishing. Please check your connection and try again.');
+      toast.error('Network error while publishing. Please check your connection and try again.');
     } finally {
       setPublishingId(null);
     }

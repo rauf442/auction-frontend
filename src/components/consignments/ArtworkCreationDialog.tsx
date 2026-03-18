@@ -2,6 +2,8 @@
 "use client"
 
 import React, { useState } from 'react'
+import { toast } from 'sonner'
+
 import { ArtworksAPI } from '@/lib/items-api'
 import { ArtistsAPI, Artist } from '@/lib/artists-api'
 import SearchableSelect from '@/components/ui/SearchableSelect'
@@ -176,7 +178,7 @@ export default function ArtworkCreationDialog({ artists, onSave, onCancel }: Art
       } catch (error: any) {
         console.error('Error creating artwork from AI analysis:', error)
         const errorMessage = error.message || 'Failed to create artwork from AI analysis. Please try again.'
-        alert(`Error: ${errorMessage}`)
+        toast.error(`Error: ${errorMessage}`)
       } finally {
         setLoading(false)
       }
@@ -227,7 +229,7 @@ export default function ArtworkCreationDialog({ artists, onSave, onCancel }: Art
       onSave(result.data)
     } catch (error) {
       console.error('Error creating artwork:', error)
-      alert('Failed to create artwork. Please try again.')
+      toast.error('Failed to create artwork. Please try again.')
     } finally {
       setLoading(false)
     }

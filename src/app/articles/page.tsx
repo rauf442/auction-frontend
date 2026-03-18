@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import Link from 'next/link'
 import { Plus, Eye, Edit, Trash2, Search, Filter, Calendar, Tag, TrendingUp } from 'lucide-react'
 import { useBrand } from '@/lib/brand-context'
@@ -136,15 +137,15 @@ export default function ArticlesPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('Article deleted successfully')
+        toast.success('Article deleted successfully')
         loadArticles()
       } else {
-        alert(data.message || 'Failed to delete article')
+        toast.error(data.message || 'Failed to delete article')
       }
 
     } catch (err: any) {
       console.error('Error deleting article:', err)
-      alert('Failed to delete article: ' + err.message)
+      toast.error('Failed to delete article: ' + err.message)
     }
   }
 

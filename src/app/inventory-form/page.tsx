@@ -5,6 +5,7 @@
 export const dynamic = 'force-dynamic'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import { toast } from 'sonner'
 import { ChevronLeft, Save, X, Upload, Trash2, Plus } from 'lucide-react'
 import { generateStartPrice, ITEM_CATEGORIES, ITEM_PERIODS, ITEM_MATERIALS, ITEM_CONDITIONS } from '@/lib/items-api'
 import { ArtistsAPI, Artist } from '@/lib/artists-api'
@@ -617,23 +618,23 @@ export default function InventoryFormPage() {
     const filesToProcess = Array.from(files).slice(0, availableSlots.length)
 
     if (filesToProcess.length === 0) {
-      alert('All image slots are already filled. Please remove some images first.')
+      toast.warning('All image slots are already filled. Please remove some images first.')
       return
     }
 
     if (filesToProcess.length < files.length) {
-      alert(`Only ${filesToProcess.length} files can be added (remaining slots available)`)
+      toast.warning(`Only ${filesToProcess.length} files can be added (remaining slots available)`)
     }
 
     filesToProcess.forEach((file, index) => {
       // Validate file type and size
       if (!file.type.startsWith('image/')) {
-        alert(`File ${file.name} is not an image`)
+        toast.error(`File ${file.name} is not an image`)
         return
       }
 
       if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        alert(`File ${file.name} is too large (max 10MB)`)
+        toast.error(`File ${file.name} is too large (max 10MB)`)
         return
       }
 

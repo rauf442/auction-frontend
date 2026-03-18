@@ -2,7 +2,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
-
+import { toast } from 'sonner'
 import { useRouter, useParams } from 'next/navigation'
 import {
   ArrowLeft, Calendar, Clock, MapPin, Trophy, Download, Upload,
@@ -312,7 +312,7 @@ const handlePreview = (artworkId: string) => {
 
     if (availableUrls.length === 0) {
       // No URLs available
-      alert('No auction URLs have been configured for this auction.')
+      toast.warning('No auction URLs have been configured for this auction.')
       return
     }
 
@@ -345,13 +345,13 @@ const handlePreview = (artworkId: string) => {
       const data = await response.json();
       if (data.success) {
         setLiveAuctioneerId(data.liveAuctioneerId);
-        alert('✅ Live Auctioneer ID updated successfully');
+        toast.success('✅ Live Auctioneer ID updated successfully');
       } else {
-        alert(`❌ Failed to update: ${data.message}`);
+        toast.error(`❌ Failed to update: ${data.message}`);
       }
     } catch (err) {
       console.error('Error updating Live Auctioneer ID:', err);
-      alert('❌ Error updating Live Auctioneer ID. Check console.');
+      toast.error('❌ Error updating Live Auctioneer ID. Check console.');
     }
   };
   const fetchLiveAuctioneerId = async () => {
@@ -388,11 +388,11 @@ const handlePreview = (artworkId: string) => {
 
   const handleSyncWithLiveAuction = async () => {
     if (!auction?.id) {
-      alert('❌ No auction selected.');
+      toast.error('❌ No auction selected.');
       return;
     }
     if (!liveAuctioneerId) {
-      alert('❌ This auction does not have a Live Auctioneer ID set.');
+      toast.error('❌ This auction does not have a Live Auctioneer ID set.');
       return;
     }
 
@@ -406,14 +406,14 @@ const handlePreview = (artworkId: string) => {
       const syncData = await syncResponse.json();
 
       if (syncData.success) {
-        alert('✅ Auction synced successfully');
+        toast.success('✅ Auction synced successfully');
         loadAuctionDetails(); // refresh auction data
       } else {
-        alert(`❌ Failed to sync auction: ${syncData.message}`);
+        toast.error(`❌ Failed to sync auction: ${syncData.message}`);
       }
     } catch (err) {
       console.error('Error syncing auction:', err);
-      alert('❌ Error syncing auction. Check console.');
+      toast.error('❌ Error syncing auction. Check console.');
     } finally {
       setSyncing(false);
     }

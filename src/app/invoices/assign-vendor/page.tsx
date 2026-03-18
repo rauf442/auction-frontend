@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect, Suspense } from 'react'
+import { toast } from 'sonner'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Package, UserPlus, Check, Loader2, AlertCircle } from 'lucide-react'
 import { useBrand } from '@/lib/brand-context'
@@ -295,7 +296,7 @@ function AssignVendorPageContent() {
         throw new Error('Some assignments failed')
       }
 
-      alert(`Successfully assigned vendors to ${selectedItems.size} item(s) and generated vendor invoices`)
+      toast.success(`Successfully assigned vendors to ${selectedItems.size} item(s) and generated vendor invoices`)
       router.push(`/invoices?auction_id=${auctionId}`)
     } catch (err: any) {
       console.error('Error assigning vendors:', err)
@@ -614,7 +615,7 @@ function AssignVendorPageContent() {
                   await fetchVendors()
                   setShowClientModal(false)
                   if (newClient?.id) {
-                    alert(`Client "${newClient.company_name || `${newClient.first_name} ${newClient.last_name}`}" created successfully!`)
+                    toast.success(`Client "${newClient.company_name || `${newClient.first_name} ${newClient.last_name}`}" created successfully!`)
                   }
                 }}
               />

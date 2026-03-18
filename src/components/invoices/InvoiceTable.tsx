@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import Link from 'next/link'
 import { MoreVertical, Edit, FileText, Package, Download, Mail, Trash2, AlertTriangle, CreditCard } from 'lucide-react'
 import { useBrand } from '@/lib/brand-context'
@@ -124,7 +125,7 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
       setTimeout(() => URL.revokeObjectURL(url), 100)
     } catch (error) {
       console.error('Failed to generate PDF:', error)
-      alert('Failed to generate PDF')
+      toast.error('Failed to generate PDF')
     }
   }
 
@@ -134,7 +135,7 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
       const clientId = invoice.client_id || invoice.client?.id
       
       if (!clientId) {
-        alert('Client ID is required to generate public URL')
+        toast.warning('Client ID is required to generate public URL')
         return
       }
 
@@ -166,7 +167,7 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
       }
     } catch (error) {
       console.error('Failed to generate public URL:', error)
-      alert('Failed to generate public URL')
+      toast.error('Failed to generate public URL')
     }
   }
 
@@ -191,7 +192,7 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
 
   const handleDeleteBulk = () => {
     if (selectedInvoices.size === 0) {
-      alert('Please select invoices to delete')
+      toast.warning('Please select invoices to delete')
       return
     }
     setDeleteTarget({ type: 'bulk' })
@@ -203,13 +204,13 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
     try {
       if (deleteTarget.type === 'single' && deleteTarget.invoice) {
         await InvoicesAPI.deleteInvoice(deleteTarget.invoice.id)
-        alert(`Invoice "${deleteTarget.invoice.invoice_number}" has been deleted successfully!`)
+        toast.success(`Invoice "${deleteTarget.invoice.invoice_number}" has been deleted successfully!`)
       } else if (deleteTarget.type === 'bulk') {
         const deletePromises = Array.from(selectedInvoices).map(invoiceId =>
           InvoicesAPI.deleteInvoice(invoiceId)
         )
         await Promise.all(deletePromises)
-        alert(`${selectedInvoices.size} invoice(s) have been deleted successfully!`)
+        toast.success(`${selectedInvoices.size} invoice(s) have been deleted successfully!`)
         setSelectedInvoices(new Set()) // Clear selection after bulk delete
       }
 
@@ -218,7 +219,7 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
       onRefresh?.()
     } catch (error) {
       console.error('Failed to delete invoice(s):', error)
-      alert('Failed to delete invoice(s). Please try again.')
+      toast.error('Failed to delete invoice(s). Please try again.')
     } finally {
       setIsDeleting(false)
     }
@@ -262,10 +263,10 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
       setSelectedInvoice(null)
       setPaidAmountInput('')
       onRefresh?.()
-      alert('Paid amount updated successfully!')
+      toast.success('Paid amount updated successfully!')
     } catch (error) {
       console.error('Failed to update paid amount:', error)
-      alert('Failed to update paid amount. Please try again.')
+      toast.error('Failed to update paid amount. Please try again.')
     } finally {
       setIsUpdatingPaidAmount(false)
     }
@@ -282,7 +283,7 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
     }
 
     if (!vendorEmail || vendorEmail.trim() === '') {
-      alert(`Vendor email address is required. Please ensure the vendor client (ID: ${invoice.client_id}) has an email address set.`)
+      toast.warning(`Vendor email address is required. Please ensure the vendor client (ID: ${invoice.client_id}) has an email address set.`)
       return
     }
 
@@ -353,7 +354,7 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
         throw new Error(data.message || 'Failed to send email')
       }
 
-      alert(`${isVendorEmail ? 'Vendor' : 'Buyer'} email sent successfully to ${data.sentTo}`)
+      toast.success(`${isVendorEmail ? 'Vendor' : 'Buyer'} email sent successfully to ${data.sentTo}`)
       setShowEmailPreview(false)
       setSelectedInvoice(null)
       setEmailType('winning_bid')

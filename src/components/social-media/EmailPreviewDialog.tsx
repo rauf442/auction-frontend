@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -47,7 +48,7 @@ export default function EmailPreviewDialog({
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns/preview`, {
+      const response = await fetch('http://localhost:3001/api/social-media/email-campaigns/preview', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +78,7 @@ export default function EmailPreviewDialog({
       setSending(true);
       const token = localStorage.getItem('token');
       const response = await fetch(
-  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns/${campaign.id}/send`,
+        `http://localhost:3001/api/social-media/email-campaigns/${campaign.id}/send`,
         {
           method: 'POST',
           headers: {
@@ -89,13 +90,13 @@ export default function EmailPreviewDialog({
       );
 
       if (response.ok) {
-        alert('Test email sent successfully!');
+        toast.success('Test email sent successfully!');
       } else {
-        alert('Failed to send test email');
+        toast.error('Failed to send test email');
       }
     } catch (error) {
       console.error('Error sending test email:', error);
-      alert('Error sending test email');
+      toast.error('Error sending test email');
     } finally {
       setSending(false);
     }
@@ -112,7 +113,7 @@ export default function EmailPreviewDialog({
       setSending(true);
       const token = localStorage.getItem('token');
       const response = await fetch(
-  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/social-media/email-campaigns/${campaign.id}/send`,
+        `http://localhost:3001/api/social-media/email-campaigns/${campaign.id}/send`,
         {
           method: 'POST',
           headers: {
@@ -123,15 +124,15 @@ export default function EmailPreviewDialog({
       );
 
       if (response.ok) {
-        alert('Campaign is being sent!');
+        toast.success('Campaign is being sent!');
         onSuccess();
         onOpenChange(false);
       } else {
-        alert('Failed to send campaign');
+        toast.error('Failed to send campaign');
       }
     } catch (error) {
       console.error('Error sending campaign:', error);
-      alert('Error sending campaign');
+      toast.error('Error sending campaign');
     } finally {
       setSending(false);
     }

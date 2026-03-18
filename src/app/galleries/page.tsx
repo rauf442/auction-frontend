@@ -2,13 +2,75 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { toast } from 'sonner'
 import Link from 'next/link'
-import { Plus, Search, Download, Upload, Filter, MoreHorizontal, Edit, Trash2, Building2, Sparkles, ExternalLink, Share2 } from 'lucide-react'
+import { Plus, Search, Download, Edit, Trash2, Building2, Sparkles, ExternalLink, Share2, ChevronDown, X } from 'lucide-react'
 import { GalleriesAPI, Gallery, GalleriesFilters } from '@/lib/galleries-api'
 import { LoadScript, StandaloneSearchBox, useJsApiLoader } from '@react-google-maps/api'
 import ExportShareModal from '@/components/ExportShareModal'
 import { useExportShare } from '@/hooks/useExportShare'
 import { ListPageHeader } from '@/components/layout/ListPageHeader'
+
+function CustomDropdown({ label, value, options, onChange, defaultValue }: {
+  label: string; value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+  defaultValue: string;
+}) {
+  const [isOpen, setIsOpen] = React.useState(false)
+  const dropdownRef = React.useRef<HTMLDivElement>(null)
+  const selectedLabel = options.find(o => o.value === value)?.label || options[0]?.label
+  const isFiltered = value !== defaultValue
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false) }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setIsOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => { document.removeEventListener('keydown', handleKeyDown); document.removeEventListener('mousedown', handleClickOutside) }
+  }, [])
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      {label && <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>}
+      <div
+        className={`flex items-center justify-between w-full px-3 py-2 border rounded-md cursor-pointer bg-white ${isFiltered ? 'border-teal-500 bg-teal-50' : 'border-gray-300'}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className={`text-sm truncate ${isFiltered ? 'text-teal-700 font-medium' : 'text-gray-700'}`}>{selectedLabel}</span>
+        <div className="flex items-center gap-1 ml-2 shrink-0">
+          {isFiltered && (
+            <button onClick={(e) => { e.stopPropagation(); onChange(defaultValue); setIsOpen(false) }}
+              className="p-0.5 rounded-full hover:bg-teal-200 text-teal-600" title="Clear">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
+            <button onClick={() => setIsOpen(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="py-1 max-h-48 overflow-y-auto">
+            {options.map((option) => (
+              <button key={option.value} onClick={() => { onChange(option.value); setIsOpen(false) }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-teal-50 hover:text-teal-700 ${value === option.value ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700'}`}>
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function GalleriesPage() {
   const [galleries, setGalleries] = useState<Gallery[]>([])
@@ -32,7 +94,6 @@ export default function GalleriesPage() {
     pages: 0
   })
 
-  // Google Places setup
   const searchBoxRef = useRef<google.maps.places.SearchBox | null>(null)
   const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
   const placesLibraries = useMemo(() => ['places'] as ("places")[], [])
@@ -41,10 +102,9 @@ export default function GalleriesPage() {
     googleMapsApiKey: googleApiKey,
     libraries: placesLibraries,
   })
-  
-  // Export/Share configuration for admin users
-  const [userRole] = useState<string>('admin') // In real app, get from auth context
-  
+
+  const [userRole] = useState<string>('admin')
+
   const galleryExportFields = [
     { key: 'name', label: 'Gallery Name', selected: true, required: true },
     { key: 'location', label: 'Location', selected: true },
@@ -77,14 +137,9 @@ export default function GalleriesPage() {
     try {
       setLoading(true)
       setError(null)
-      
       const searchFilters = { ...filters }
-      if (searchTerm) {
-        searchFilters.search = searchTerm
-      }
-      
+      if (searchTerm) searchFilters.search = searchTerm
       const response = await GalleriesAPI.getGalleries(searchFilters)
-      
       if (response.success) {
         setGalleries(response.data)
         setPagination(response.pagination)
@@ -109,15 +164,12 @@ export default function GalleriesPage() {
   }
 
   const handleDelete = async (galleryId: string, galleryName: string) => {
-    if (!confirm(`Are you sure you want to delete "${galleryName}"?`)) {
-      return
-    }
-
+    if (!confirm(`Are you sure you want to delete "${galleryName}"?`)) return
     try {
       await GalleriesAPI.deleteGallery(galleryId)
-      await loadGalleries() // Refresh the list
+      await loadGalleries()
     } catch (err: any) {
-      alert(`Failed to delete gallery: ${err.message}`)
+      toast.error(`Failed to delete gallery: ${err.message}`)
     }
   }
 
@@ -125,14 +177,13 @@ export default function GalleriesPage() {
     try {
       await GalleriesAPI.exportCSV(filters)
     } catch (err: any) {
-      alert(`Failed to export galleries: ${err.message}`)
+      toast.error(`Failed to export galleries: ${err.message}`)
     }
   }
 
   const handlePlacesChanged = () => {
     const box = searchBoxRef.current
     if (!box) return
-    
     const places = box.getPlaces()
     if (places && places.length > 0) {
       const place = places[0]
@@ -144,52 +195,29 @@ export default function GalleriesPage() {
 
   const handleGoogleSearch = () => {
     if (selectedPlace?.name) {
-      const searchQuery = `${selectedPlace.name} gallery`
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, '_blank')
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedPlace.name + ' gallery')}`, '_blank')
     }
   }
 
   const handleAiGenerateFromPlace = async () => {
     if (!selectedPlace?.name) return
-
     try {
       setAiGenerating(true)
-      
-      // Call AI generation API for galleries
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/galleries/generate-ai`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          name: selectedPlace.name,
-          location: selectedPlace.formatted_address
-        })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ name: selectedPlace.name, location: selectedPlace.formatted_address })
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to generate AI content')
-      }
-
+      if (!response.ok) throw new Error('Failed to generate AI content')
       const data = await response.json()
-      
       if (data.success) {
-        // Navigate to gallery form with AI-generated data
-        const galleryData = {
-          ...data.data,
-          name: selectedPlace.name
-        }
-        
+        const galleryData = { ...data.data, name: selectedPlace.name }
         const params = new URLSearchParams()
-        Object.entries(galleryData).forEach(([key, value]) => {
-          if (value) params.append(key, value.toString())
-        })
-        
+        Object.entries(galleryData).forEach(([key, value]) => { if (value) params.append(key, value.toString()) })
         window.location.href = `/galleries/new?${params.toString()}`
       }
     } catch (err: any) {
-      alert(`Failed to generate gallery details: ${err.message}`)
+      toast.error(`Failed to generate gallery details: ${err.message}`)
     } finally {
       setAiGenerating(false)
     }
@@ -211,49 +239,29 @@ export default function GalleriesPage() {
     { value: 'cooperative', label: 'Cooperative' }
   ]
 
+  const sortOptions = [
+    { value: 'name-asc', label: 'Name (A-Z)' },
+    { value: 'name-desc', label: 'Name (Z-A)' },
+    { value: 'location-asc', label: 'Location (A-Z)' },
+    { value: 'founded_year-desc', label: 'Founded Year (Newest)' },
+    { value: 'founded_year-asc', label: 'Founded Year (Oldest)' },
+    { value: 'created_at-desc', label: 'Recently Added' },
+  ]
+
   const getStatusBadge = (status: string) => {
-    const colors = {
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-yellow-100 text-yellow-800',
-      archived: 'bg-gray-100 text-gray-800'
-    }
+    const colors = { active: 'bg-green-100 text-green-800', inactive: 'bg-yellow-100 text-yellow-800', archived: 'bg-gray-100 text-gray-800' }
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800'
   }
 
   const getGalleryTypeBadge = (type: string) => {
-    const colors = {
-      commercial: 'bg-blue-100 text-blue-800',
-      museum: 'bg-purple-100 text-purple-800',
-      institution: 'bg-indigo-100 text-indigo-800',
-      private: 'bg-pink-100 text-pink-800',
-      cooperative: 'bg-teal-100 text-teal-800'
-    }
+    const colors = { commercial: 'bg-blue-100 text-blue-800', museum: 'bg-purple-100 text-purple-800', institution: 'bg-indigo-100 text-indigo-800', private: 'bg-pink-100 text-pink-800', cooperative: 'bg-teal-100 text-teal-800' }
     return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800'
   }
 
   const headerActions = [
-    {
-      label: 'Add gallery',
-      icon: Plus,
-      href: '/galleries/new',
-      variant: 'primary' as const
-    },
-    {
-      label: 'Export CSV',
-      icon: Download,
-      onClick: handleExport,
-      variant: 'secondary' as const
-    },
-    ...(userRole === 'super_admin'
-      ? [
-          {
-            label: 'Export & share',
-            icon: Share2,
-            onClick: exportShare.openModal,
-            variant: 'ghost' as const
-          }
-        ]
-      : [])
+    { label: 'Add gallery', icon: Plus, href: '/galleries/new', variant: 'primary' as const },
+    { label: 'Export CSV', icon: Download, onClick: handleExport, variant: 'secondary' as const },
+    ...(userRole === 'super_admin' ? [{ label: 'Export & share', icon: Share2, onClick: exportShare.openModal, variant: 'ghost' as const }] : [])
   ]
 
   return (
@@ -273,74 +281,42 @@ export default function GalleriesPage() {
 
         <section className="rounded-3xl border border-slate-200 bg-white/95 shadow-sm">
           <div className="border-b border-slate-100 px-6 py-6">
-          <div className="space-y-4">
-            {/* Gallery Search with Autocomplete */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Search World Famous Galleries
-              </label>
-
-              {isLoaded && (
-                <div className="flex items-center space-x-2">
-                  <div className="flex-1 relative">
-                    <Search className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
-                    <StandaloneSearchBox
-                      onLoad={(ref) => { searchBoxRef.current = ref }}
-                      onPlacesChanged={handlePlacesChanged}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Search famous galleries like Louvre, MoMA, Tate Modern..."
-                        value={searchTerm}
-                        onChange={(e) => {
-                          setSearchTerm(e.target.value)
-                          if (!e.target.value) {
-                            setShowAddOption(false)
-                            setSelectedPlace(null)
-                          }
-                        }}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                      />
-                    </StandaloneSearchBox>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Search World Famous Galleries</label>
+                {isLoaded && (
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 relative">
+                      <Search className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
+                      <StandaloneSearchBox onLoad={(ref) => { searchBoxRef.current = ref }} onPlacesChanged={handlePlacesChanged}>
+                        <input
+                          type="text"
+                          placeholder="Search famous galleries like Louvre, MoMA, Tate Modern..."
+                          value={searchTerm}
+                          onChange={(e) => { setSearchTerm(e.target.value); if (!e.target.value) { setShowAddOption(false); setSelectedPlace(null) } }}
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        />
+                      </StandaloneSearchBox>
+                    </div>
+                    {showAddOption && selectedPlace && (
+                      <>
+                        <button type="button" onClick={handleGoogleSearch} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer">
+                          <ExternalLink className="h-4 w-4 mr-2" />Search
+                        </button>
+                        <button type="button" onClick={handleAiGenerateFromPlace} disabled={aiGenerating} className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 cursor-pointer">
+                          {aiGenerating ? <div className="animate-spin rounded-full h-4 w-4 mr-2 border-b-2 border-white"></div> : <Sparkles className="h-4 w-4 mr-2" />}
+                          {aiGenerating ? 'Generating...' : 'Add with AI'}
+                        </button>
+                      </>
+                    )}
                   </div>
+                )}
+              </div>
 
-                  {showAddOption && selectedPlace && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleGoogleSearch}
-                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Search
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleAiGenerateFromPlace}
-                        disabled={aiGenerating}
-                        className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 cursor-pointer"
-                      >
-                        {aiGenerating ? (
-                          <div className="animate-spin rounded-full h-4 w-4 mr-2 border-b-2 border-white"></div>
-                        ) : (
-                          <Sparkles className="h-4 w-4 mr-2" />
-                        )}
-                        {aiGenerating ? 'Generating...' : 'Add with AI'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Traditional Search */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Search Existing Galleries
-              </label>
-              <form onSubmit={handleSearch} className="flex items-center space-x-4">
-                <div className="flex-1">
-                  <div className="relative">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Search Existing Galleries</label>
+                <form onSubmit={handleSearch} className="flex items-center space-x-4">
+                  <div className="flex-1 relative">
                     <Search className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                     <input
                       type="text"
@@ -350,255 +326,151 @@ export default function GalleriesPage() {
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                   </div>
-                </div>
-                
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 cursor-pointer"
-                >
-                  Search Database
-                </button>
-              </form>
+                  <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 cursor-pointer">Search Database</button>
+                </form>
+              </div>
             </div>
-          </div>
           </div>
 
           <div className="px-6 py-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={filters.status || ''}
-                onChange={(e) => handleFilterChange({ status: e.target.value || undefined })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <CustomDropdown label="Status" value={filters.status || ''} options={statusOptions} onChange={(val) => handleFilterChange({ status: val || undefined })} defaultValue="" />
+              </div>
+              <div>
+                <CustomDropdown label="Type" value={filters.gallery_type || ''} options={galleryTypeOptions} onChange={(val) => handleFilterChange({ gallery_type: val || undefined })} defaultValue="" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <input type="text" placeholder="Filter by location" value={filters.location || ''} onChange={(e) => handleFilterChange({ location: e.target.value || undefined })} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                <input type="text" placeholder="Filter by country" value={filters.country || ''} onChange={(e) => handleFilterChange({ country: e.target.value || undefined })} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              </div>
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-              <select
-                value={filters.gallery_type || ''}
-                onChange={(e) => handleFilterChange({ gallery_type: e.target.value || undefined })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                {galleryTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-              <input
-                type="text"
-                placeholder="Filter by location"
-                value={filters.location || ''}
-                onChange={(e) => handleFilterChange({ location: e.target.value || undefined })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
-              <input
-                type="text"
-                placeholder="Filter by country"
-                value={filters.country || ''}
-                onChange={(e) => handleFilterChange({ country: e.target.value || undefined })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-          </div>
           </div>
         </section>
 
         {error && (
-          <div className="rounded-3xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-sm">
-            {error}
-          </div>
+          <div className="rounded-3xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-sm">{error}</div>
         )}
 
         <section className="rounded-3xl border border-slate-200 bg-white/95 shadow-sm">
           <div className="border-b border-slate-100 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              Showing {galleries.length} of {pagination.total} galleries
-            </p>
-            
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Sort by:</span>
-              <select
-                value={`${filters.sort_field}-${filters.sort_direction}`}
-                onChange={(e) => {
-                  const [field, direction] = e.target.value.split('-')
-                  handleFilterChange({ 
-                    sort_field: field, 
-                    sort_direction: direction as 'asc' | 'desc' 
-                  })
-                }}
-                className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                <option value="name-asc">Name (A-Z)</option>
-                <option value="name-desc">Name (Z-A)</option>
-                <option value="location-asc">Location (A-Z)</option>
-                <option value="founded_year-desc">Founded Year (Newest)</option>
-                <option value="founded_year-asc">Founded Year (Oldest)</option>
-                <option value="created_at-desc">Recently Added</option>
-              </select>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-600">Showing {galleries.length} of {pagination.total} galleries</p>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Sort by:</span>
+                <div className="w-48">
+                  <CustomDropdown
+                    label=""
+                    value={`${filters.sort_field}-${filters.sort_direction}`}
+                    options={sortOptions}
+                    onChange={(val) => {
+                      const [field, direction] = val.split('-')
+                      handleFilterChange({ sort_field: field, sort_direction: direction as 'asc' | 'desc' })
+                    }}
+                    defaultValue="name-asc"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
           </div>
 
           {loading ? (
             <div className="flex h-64 items-center justify-center text-slate-500">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
-          </div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+            </div>
           ) : galleries.length === 0 ? (
             <div className="px-6 py-12 text-center">
-            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No galleries found</h3>
-            <p className="text-gray-600 mb-4">
-              {searchTerm || filters.status !== 'active' 
-                ? 'Try adjusting your search or filters' 
-                : 'Get started by adding your first gallery'
-              }
-            </p>
-            <Link
-              href="/galleries/new"
-              className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 cursor-pointer"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Gallery
-            </Link>
-          </div>
+              <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No galleries found</h3>
+              <p className="text-gray-600 mb-4">{searchTerm || filters.status !== 'active' ? 'Try adjusting your search or filters' : 'Get started by adding your first gallery'}</p>
+              <Link href="/galleries/new" className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 cursor-pointer">
+                <Plus className="h-4 w-4 mr-2" />Add Gallery
+              </Link>
+            </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Gallery
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Location
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ width: '120px' }}>
-                      Director
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {galleries.map((gallery) => (
-                    <tr key={gallery.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {gallery.name}
-                          </div>
-                          {gallery.website && (
-                            <div className="text-sm text-gray-500">
-                              <a 
-                                href={gallery.website} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="hover:text-teal-600"
-                              >
-                                {gallery.website}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getGalleryTypeBadge(gallery.gallery_type || '')}`}>
-                          {gallery.gallery_type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {gallery.location}
-                          {gallery.country && gallery.location && ', '}
-                          {gallery.country}
-                        </div>
-                        {gallery.founded_year && (
-                          <div className="text-sm text-gray-500">
-                            Founded {gallery.founded_year}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{gallery.director}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(gallery.status || 'active')}`}>
-                          {gallery.status}
-                        </span>
-                        {gallery.is_verified && (
-                          <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                            Verified
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Link
-                            href={`/galleries/edit/${gallery.id}`}
-                            className="text-teal-600 hover:text-teal-900 cursor-pointer hover:underline"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(gallery.id!, gallery.name)}
-                            className="text-red-600 hover:text-red-900 cursor-pointer hover:underline"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
+              {/* TABLE VIEW - large screens */}
+              <div className="hidden xl:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gallery</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Director</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {galleries.map((gallery) => (
+                      <tr key={gallery.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">{gallery.name}</div>
+                          {gallery.website && <div className="text-sm text-gray-500"><a href={gallery.website} target="_blank" rel="noopener noreferrer" className="hover:text-teal-600">{gallery.website}</a></div>}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getGalleryTypeBadge(gallery.gallery_type || '')}`}>{gallery.gallery_type}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{gallery.location}{gallery.country && gallery.location && ', '}{gallery.country}</div>
+                          {gallery.founded_year && <div className="text-sm text-gray-500">Founded {gallery.founded_year}</div>}
+                        </td>
+                        <td className="px-6 py-4"><div className="text-sm text-gray-900">{gallery.director}</div></td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(gallery.status || 'active')}`}>{gallery.status}</span>
+                          {gallery.is_verified && <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Verified</span>}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <Link href={`/galleries/edit/${gallery.id}`} className="text-teal-600 hover:text-teal-900"><Edit className="h-4 w-4" /></Link>
+                            <button onClick={() => handleDelete(gallery.id!, gallery.name)} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* CARD VIEW - smaller screens */}
+              <div className="xl:hidden divide-y divide-gray-200">
+                {galleries.map((gallery) => (
+                  <div key={gallery.id} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="text-sm font-semibold text-gray-900">{gallery.name}</span>
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${getGalleryTypeBadge(gallery.gallery_type || '')}`}>{gallery.gallery_type}</span>
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusBadge(gallery.status || 'active')}`}>{gallery.status}</span>
+                          {gallery.is_verified && <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Verified</span>}
+                        </div>
+                        {gallery.website && <a href={gallery.website} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline block truncate mb-2">{gallery.website}</a>}
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                          {(gallery.location || gallery.country) && <div><span className="font-medium text-gray-500">Location: </span>{gallery.location}{gallery.country && gallery.location && ', '}{gallery.country}</div>}
+                          {gallery.founded_year && <div><span className="font-medium text-gray-500">Founded: </span>{gallery.founded_year}</div>}
+                          {gallery.director && <div className="col-span-2"><span className="font-medium text-gray-500">Director: </span>{gallery.director}</div>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Link href={`/galleries/edit/${gallery.id}`} className="p-1.5 text-teal-600 hover:text-teal-900 hover:bg-teal-50 rounded"><Edit className="h-4 w-4" /></Link>
+                        <button onClick={() => handleDelete(gallery.id!, gallery.name)} className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {pagination.pages > 1 && (
                 <div className="flex flex-col gap-3 border-t border-slate-100 px-6 py-4 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
-                  <span>
-                    Page {pagination.page} of {pagination.pages}
-                  </span>
+                  <span>Page {pagination.page} of {pagination.pages}</span>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleFilterChange({ page: Math.max(1, pagination.page - 1) })}
-                      disabled={pagination.page === 1}
-                      className="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => handleFilterChange({ page: Math.min(pagination.pages, pagination.page + 1) })}
-                      disabled={pagination.page === pagination.pages}
-                      className="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Next
-                    </button>
+                    <button onClick={() => handleFilterChange({ page: Math.max(1, pagination.page - 1) })} disabled={pagination.page === 1} className="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
+                    <button onClick={() => handleFilterChange({ page: Math.min(pagination.pages, pagination.page + 1) })} disabled={pagination.page === pagination.pages} className="rounded-2xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
                   </div>
                 </div>
               )}
@@ -620,4 +492,4 @@ export default function GalleriesPage() {
       </div>
     </div>
   )
-} 
+}

@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { X, Package, Calculator, CreditCard, Truck, MapPin, Building } from 'lucide-react'
 import { LogisticsInfo } from '../../types/invoice'
 import { countries } from '../../data/countries'
@@ -191,28 +192,28 @@ export default function PublicShippingDialog({
             if (paymentResult.success) {
               // Open the payment link in a new tab
               window.open(paymentResult.paymentLink, '_blank')
-              alert('Shipping information saved! Please complete the payment using the link that opened in a new tab.')
+              toast.success('Shipping information saved! Please complete the payment using the link that opened in a new tab.')
             } else {
               console.warn('Failed to create shipping payment link:', paymentResult.message)
-              alert('Shipping information saved, but payment link creation failed. Please contact us for payment instructions.')
+              toast.error('Shipping information saved, but payment link creation failed. Please contact us for payment instructions.')
             }
           } catch (paymentError) {
             console.warn('Error creating shipping payment link:', paymentError)
-            alert('Shipping information saved, but payment link creation failed. Please contact us for payment instructions.')
+            toast.error('Shipping information saved, but payment link creation failed. Please contact us for payment instructions.')
           }
         } else {
           // No shipping cost (customer collection or customer courier)
-          alert('Shipping information saved successfully!')
+          toast.success('Shipping information saved successfully!')
         }
 
         onSuccess?.()
         onClose()
       } else {
-        alert(result.message || 'Failed to update shipping information')
+        toast.error(result.message || 'Failed to update shipping information')
       }
     } catch (error: any) {
       console.error('Failed to confirm shipping:', error)
-      alert('Failed to confirm shipping information')
+      toast.error('Failed to confirm shipping information')
     } finally {
       setLoading(false)
     }

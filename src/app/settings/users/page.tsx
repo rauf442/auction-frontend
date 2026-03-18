@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Plus, ChevronDown, Loader2, Edit, Trash2, X } from 'lucide-react'
 import UsersAPI, { User } from '@/lib/users-api'
 import { useBrand } from '@/lib/brand-context'
@@ -358,10 +359,10 @@ export default function UsersPage() {
           user.id === userId ? { ...user, role: newRole } : user
         ))
       } else {
-        alert('Failed to update user role: ' + (response.error || 'Unknown error'))
+        toast.error('Failed to update user role: ' + (response.error || 'Unknown error'))
       }
     } catch (err: any) {
-      alert('Failed to update user role: ' + err.message)
+      toast.error('Failed to update user role: ' + err.message)
     }
   }
 
@@ -374,10 +375,10 @@ export default function UsersPage() {
           user.id === userId ? { ...user, is_active: !isActive } : user
         ))
       } else {
-        alert('Failed to update user status: ' + (response.error || 'Unknown error'))
+        toast.error('Failed to update user status: ' + (response.error || 'Unknown error'))
       }
     } catch (err: any) {
-      alert('Failed to update user status: ' + err.message)
+      toast.error('Failed to update user status: ' + err.message)
     }
   }
 
@@ -416,10 +417,10 @@ export default function UsersPage() {
         setShowDeleteModal(false)
         setSelectedUser(null)
       } else {
-        alert('Failed to delete user: ' + (response.error || 'Unknown error'))
+        toast.error('Failed to delete user: ' + (response.error || 'Unknown error'))
       }
     } catch (err: any) {
-      alert('Failed to delete user: ' + err.message)
+      toast.error('Failed to delete user: ' + err.message)
     } finally {
       setDeleting(false)
     }

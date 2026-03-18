@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { Save, Edit3, X, Check, Settings, Globe, Building, Database, Camera, ExternalLink } from 'lucide-react'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
@@ -263,7 +264,7 @@ export default function BrandsAdminPage() {
       }
     } catch (error: any) {
       console.error('Error saving Google Sheets URL:', error)
-      alert(`Error: ${error.message}`)
+      toast.error(`Error: ${error.message}`)
     }
   }
   
@@ -295,7 +296,7 @@ export default function BrandsAdminPage() {
 
   const createBrand = async () => {
     if (!code.trim() || !name.trim()) {
-      alert('Please enter both code and name')
+      toast.warning('Please enter both code and name')
       return
     }
     
@@ -317,11 +318,11 @@ export default function BrandsAdminPage() {
         setTimeout(() => document.body.removeChild(successDiv), 3000)
       } else {
         const data = await res.json()
-        alert(data.error || 'Failed to create brand')
+        toast.error(data.error || 'Failed to create brand')
       }
     } catch (error) {
       console.error('Error creating brand:', error)
-      alert('Failed to create brand')
+      toast.error('Failed to create brand')
     }
   }
 
@@ -388,7 +389,7 @@ export default function BrandsAdminPage() {
       }
     } catch (error: any) {
       console.error('Error uploading image:', error)
-      alert(`Error uploading image: ${error.message}`)
+      toast.error(`Error uploading image: ${error.message}`)
     } finally {
       setUploadingImage(null)
     }
@@ -433,7 +434,7 @@ export default function BrandsAdminPage() {
       }
     } catch (error: any) {
       console.error('Error updating brand:', error)
-      alert(`Error updating brand: ${error.message}`)
+      toast.error(`Error updating brand: ${error.message}`)
     }
   }
 

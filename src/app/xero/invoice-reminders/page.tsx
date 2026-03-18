@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -417,7 +418,7 @@ export default function XeroInvoiceRemindersPage() {
                                   onClick={() => {
                                     // Implement send reminder functionality
                                     console.log('Send reminder for invoice:', invoice.invoiceID)
-                                    alert(`Send reminder feature would be implemented here for invoice ${invoice.invoiceNumber}`)
+                                    toast.info(`Send reminder feature would be implemented here for invoice ${invoice.invoiceNumber}`)
                                   }}
                                   className="flex items-center gap-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                                   disabled={contactEmail === 'No email'}

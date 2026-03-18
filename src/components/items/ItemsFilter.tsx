@@ -493,18 +493,19 @@ export default function ItemsFilter({ filters, onFilterChange, statusCounts, fil
           {/* Brand */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
-            <select
+            <SearchableSelect
               value={filters.brand || ''}
-              onChange={(e) => onFilterChange({ brand: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
-            >
-              <option value="">All Brands</option>
-              {brands.map((brand) => (
-                <option key={brand.id} value={brand.code}>
-                  {brand.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'All Brands' },
+                ...brands.map((b) => ({
+                  value: b.code,
+                  label: b.name
+                }))
+              ]}
+              placeholder="Select brand..."
+              onChange={(value) => onFilterChange({ brand: value?.toString() || '' })}
+              className="w-full"
+            />
           </div>
 
           {/* Condition */}

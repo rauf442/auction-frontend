@@ -2,6 +2,8 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
+
 import { Save, X, Eye, Upload, Image as ImageIcon } from 'lucide-react'
 import { useBrand } from '@/lib/brand-context'
 
@@ -141,12 +143,12 @@ export default function ArticleForm({
       if (data.success && data.url) {
         setFormData(prev => ({ ...prev, cover_image_url: data.url }))
       } else {
-        alert('Failed to upload image: ' + (data.message || 'Unknown error'))
+        toast.error('Failed to upload image: ' + (data.message || 'Unknown error'))
       }
 
     } catch (err: any) {
       console.error('Error uploading image:', err)
-      alert('Failed to upload image: ' + err.message)
+      toast.error('Failed to upload image: ' + err.message)
     } finally {
       setUploading(false)
     }
@@ -190,7 +192,7 @@ export default function ArticleForm({
     e.preventDefault()
 
     if (!formData.title || !formData.slug || !formData.content) {
-      alert('Please fill in all required fields (Title, Slug, and Content)')
+      toast.warning('Please fill in all required fields (Title, Slug, and Content)')
       return
     }
 
@@ -220,15 +222,15 @@ export default function ArticleForm({
       const data = await response.json()
 
       if (data.success) {
-        alert(`Article ${mode === 'create' ? 'created' : 'updated'} successfully!`)
+        toast.success(`Article ${mode === 'create' ? 'created' : 'updated'} successfully!`)
         onSuccess()
       } else {
-        alert(data.message || `Failed to ${mode} article`)
+        toast.error(data.message || `Failed to ${mode} article`)
       }
 
     } catch (err: any) {
       console.error(`Error ${mode}ing article:`, err)
-      alert(`Failed to ${mode} article: ` + err.message)
+      toast.error(`Failed to ${mode} article: ` + err.message)
     } finally {
       setLoading(false)
     }

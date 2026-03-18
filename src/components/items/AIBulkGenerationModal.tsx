@@ -2,6 +2,8 @@
 "use client"
 
 import React, { useState, useRef } from 'react'
+import { toast } from 'sonner'
+
 import { X, Upload, Eye, Trash2, Sparkles, Check, Loader, Edit3 } from 'lucide-react'
 import { syncArtworksToGoogleSheet } from '@/lib/google-sheets-api'
 import { useBrand } from '@/lib/brand-context'
@@ -456,7 +458,7 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
       onComplete(savedArtworks)
     } catch (error) {
       console.error('Error saving artworks:', error)
-      alert('Error saving some artworks. Please check the console for details.')
+      toast.error('Error saving some artworks. Please check the console for details.')
     } finally {
       setIsGenerating(false)
     }

@@ -2,6 +2,8 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react'
+import { toast } from 'sonner'
+
 import { Upload, Sparkles, X, AlertCircle, CheckCircle, Loader2, Edit3, Eye } from 'lucide-react'
 import { ArtistsAPI } from '../../lib/artists-api'
 import { autoSyncArtworkToGoogleSheet } from '../../lib/google-sheets-api'
@@ -270,7 +272,7 @@ export default function AIImageUpload({ onUploadComplete, onClose, currentBrand 
 
       if (response.success && response.data) {
         console.log('Artwork created successfully:', response.data)
-        alert('Artwork created successfully!')
+        toast.success('Artwork created successfully!')
 
         // Call the artwork created callback to add to consignment
         if (onArtworkCreated) {
@@ -283,7 +285,7 @@ export default function AIImageUpload({ onUploadComplete, onClose, currentBrand 
       }
     } catch (error: any) {
       console.error('Error creating artwork:', error)
-      alert(`Error creating artwork: ${error.message || 'Unknown error'}`)
+      toast.error(`Error creating artwork: ${error.message || 'Unknown error'}`)
     } finally {
       setLoading(false)
     }

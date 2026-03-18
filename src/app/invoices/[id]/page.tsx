@@ -2,6 +2,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Download, FileText, Package, User, MapPin, Calendar, CreditCard, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -158,7 +159,7 @@ export default function InvoiceViewPage({ params }: { params: Promise<{ id: stri
       document.body.removeChild(a)
     } catch (err: any) {
       console.error('Error generating PDF:', err)
-      alert('Failed to generate PDF: ' + err.message)
+      toast.error('Failed to generate PDF: ' + err.message)
     }
   }
 

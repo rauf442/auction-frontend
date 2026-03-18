@@ -2,7 +2,7 @@
 "use client"
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
-
+import { X } from 'lucide-react'
 export interface SearchableOption<T = string | number> {
   value: T
   label: string
@@ -106,6 +106,15 @@ export default function SearchableSelect<T = string | number>({
     }
   }, [enableDynamicSearch, handleDynamicSearch, onChange])
 
+  // Escape key to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && open) setOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [open])
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -134,16 +143,33 @@ export default function SearchableSelect<T = string | number>({
 
   return (
     <div ref={componentRef} className={`relative ${className || ''}`}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
-        className={`w-full px-3 py-2 border rounded-md text-left overflow-hidden transition-all duration-200 ease-in-out hover:shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'} border-gray-300 bg-white`}
-      >
-        <span className="truncate block min-w-0 text-gray-900">
-          {currentLabel || placeholder}
-        </span>
-      </button>
+      <div className="relative flex items-center">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen((v) => !v)}
+          className={`w-full px-3 py-2 pr-8 border rounded-md text-left overflow-hidden transition-all duration-200 ease-in-out hover:shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'} border-gray-300 bg-white`}
+        >
+          <span className="truncate block min-w-0 text-gray-900">
+            {currentLabel || placeholder}
+          </span>
+        </button>
+        {value && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onChange?.('' as T)
+              setQuery('')
+              setOpen(false)
+            }}
+            className="absolute right-2 p-0.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            title="Clear"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
       {open && (
         <div className="fixed inset-0 z-40" onClick={() => setOpen(false)}>
           <div
@@ -155,18 +181,23 @@ export default function SearchableSelect<T = string | number>({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-          <div className="p-2 border-b">
+          <div className="p-2 border-b flex items-center gap-2">
             <input
               autoFocus
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               placeholder={inputPlaceholder}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
-            {loading && (
-              <div className="text-xs text-gray-500 mt-1">Searching...</div>
-            )}
+            <button
+              onClick={() => setOpen(false)}
+              className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 shrink-0"
+              title="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
+          {loading && <div className="text-xs text-gray-500 px-3 pt-1">Searching...</div>}
           <div className="max-h-80 overflow-auto">
             {isLoading && (
               <div className="px-3 py-3 text-sm text-gray-500 flex items-center gap-2">

@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import XeroConfiguration from '@/components/settings/XeroConfiguration'
 
 type Brand = { id: string; code: string; name: string }
@@ -75,9 +76,9 @@ export default function PlatformSettingsPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Test failed')
-      alert(`${platform} OK: ${data.message || 'success'}`)
+      toast.success(`${platform} OK: ${data.message || 'success'}`)
     } catch (e: any) {
-      alert(`${platform} failed: ${e.message}`)
+      toast.error(`${platform} failed: ${e.message}`)
     }
   }
 

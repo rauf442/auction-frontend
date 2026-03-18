@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { X, User, Package, AlertCircle } from 'lucide-react'
 import { useBrand } from '@/lib/brand-context'
 import SearchableSelect from '@/components/ui/SearchableSelect'
@@ -164,7 +165,7 @@ export default function VendorAssignmentDialog({
         throw new Error(result.message || 'Failed to assign vendor')
       }
 
-      alert(`Successfully assigned vendor to ${selectedItems.size} item(s)${!selectedConsignment ? ' and created new consignment' : ''}`)
+      toast.success(`Successfully assigned vendor to ${selectedItems.size} item(s)${!selectedConsignment ? ' and created new consignment' : ''}`)
       onSuccess()
       onClose()
     } catch (err: any) {

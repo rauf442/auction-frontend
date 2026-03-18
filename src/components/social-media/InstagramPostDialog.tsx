@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -117,11 +118,11 @@ export default function InstagramPostDialog({
         const data = await response.json();
         setFormData((prev) => ({ ...prev, media_url: data.url }));
       } else {
-        alert('Failed to upload image');
+        toast.error('Failed to upload image');
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Error uploading image');
+      toast.error('Error uploading image');
     } finally {
       setUploading(false);
     }
@@ -158,7 +159,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       const data = await response.json();
       console.log('✅ Success! Response data:', data); // Debug log
       
-      alert(post ? 'Post updated successfully!' : 'Post created successfully!'); // User feedback
+      toast.success(post ? 'Post updated successfully!' : 'Post created successfully!'); // User feedback
       
       onSuccess();
       onOpenChange(false);
@@ -166,11 +167,11 @@ const handleSubmit = async (e: React.FormEvent) => {
       // Handle error response
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       console.error('❌ Server error:', errorData);
-      alert(`Failed to save: ${errorData.error || errorData.message || 'Unknown error'}`);
+      toast.error(`Failed to save: ${errorData.error || errorData.message || 'Unknown error'}`);
     }
   } catch (error) {
     console.error('💥 Network/Error saving post:', error);
-    alert(`Error: ${error instanceof Error ? error.message : 'Network error'}`);
+    toast.error(`Error: ${error instanceof Error ? error.message : 'Network error'}`);
   } finally {
     setLoading(false);
   }

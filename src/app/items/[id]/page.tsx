@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ChevronLeft, ChevronRight, Heart, Share2, ExternalLink, Eye, Maximize2, AlertCircle, Loader2, Edit3, Calendar, User, Tag, Palette, Ruler, Info, FileText, DollarSign, Package, Clock, MapPin, Award, BookOpen, Sparkles } from 'lucide-react'
 import { Artwork, ArtworksAPI, formatCurrency, getStatusColor, getStatusLabel } from '@/lib/items-api'
@@ -145,7 +146,7 @@ export default function ItemPreviewPage() {
       })
     } else {
       navigator.clipboard.writeText(window.location.href)
-      alert('Link copied to clipboard!')
+      toast.success('Link copied to clipboard!')
     }
   }
 
