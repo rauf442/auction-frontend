@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { MoreVertical, Edit, FileText, Package, Download, Mail, Trash2, AlertTriangle, CreditCard } from 'lucide-react'
+import { MoreVertical, Edit, FileText, Package, Download, Mail, Trash2, AlertTriangle, CreditCard, X } from 'lucide-react'
 import { useBrand } from '@/lib/brand-context'
 import { generateInvoicePdf } from '@/lib/auctions-api'
 import { InvoicesAPI } from '@/lib/invoices-api'
@@ -75,6 +75,17 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
   // Client data cache
   const [clientData, setClientData] = useState<Map<number, Client>>(new Map())
   const [loadingClients, setLoadingClients] = useState<Set<number>>(new Set())
+
+  // Close dropdown on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActionMenuOpen(null)
+    }
+    if (actionMenuOpen) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [actionMenuOpen])
 
   // Load client data for invoices that have client_id but no client data
   const loadClientData = async (clientId: number) => {
@@ -691,6 +702,15 @@ const handleGeneratePdf = async (invoiceId: number, type: 'internal' | 'final') 
 
                       {actionMenuOpen === invoice.id && (
                         <div className="absolute right-0 mt-2 w-80 rounded-xl shadow-2xl bg-white ring-1 ring-black ring-opacity-10 z-10 max-h-[600px] overflow-y-auto border border-gray-200">
+                          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                            <span className="text-xs font-medium text-gray-500">Actions</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setActionMenuOpen(null) }}
+                              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                           <div className="py-2" role="menu">
                             {/* Buyer Invoice Workflow */}
                             {invoice.type !== 'vendor' && (
