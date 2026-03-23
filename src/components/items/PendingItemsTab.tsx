@@ -45,6 +45,7 @@ export default function PendingItemsTab() {
             setLoading(false);
         }
     };
+    useEffect(() => { load() }, [])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
