@@ -112,22 +112,30 @@ export default function InvoiceTable({ invoices, loading = false, onRefresh, inv
     })
   }, [invoices, clientData, loadingClients])
 
-  const handleGeneratePdf = async (invoiceId: number, type: 'internal' | 'final') => {
-    try {
-      const brandCode = typeof brand === 'string' ? brand : (brand as any)?.code
-      const blob = await generateInvoicePdf(invoiceId, type, brandCode)
-
-      // Create blob URL and open in new tab
-      const url = URL.createObjectURL(blob)
-      window.open(url, '_blank')
-
-      // Clean up
-      setTimeout(() => URL.revokeObjectURL(url), 100)
-    } catch (error) {
-      console.error('Failed to generate PDF:', error)
-      toast.error('Failed to generate PDF')
+const handleGeneratePdf = async (invoiceId: number, type: 'internal' | 'final') => {
+  try {
+    const brandCode = typeof brand === 'string' ? brand : (brand as any)?.code
+    const blob = await generateInvoicePdf(invoiceId, type, brandCode)
+    const url = URL.createObjectURL(blob)
+    // Open in new tab for viewing
+    const newTab = window.open('', '_blank')
+    if (newTab) {
+      newTab.document.write(`
+        <html>
+          <head><title>Invoice ${invoiceId}</title></head>
+          <body style="margin:0">
+            <embed src="${url}" type="application/pdf" width="100%" height="100%" />
+          </body>
+        </html>
+      `)
+      newTab.document.close()
     }
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  } catch (error) {
+    console.error('Failed to generate PDF:', error)
+    toast.error('Failed to generate PDF')
   }
+}
 
   const handleGeneratePublicUrl = async (invoice: Invoice) => {
     try {
