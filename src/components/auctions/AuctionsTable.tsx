@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, forwardRef, useImperativeHandle } from 'react'
+import React, { useState, forwardRef, useImperativeHandle, useEffect } from 'react'
 import { ChevronUp, ChevronDown, Edit, Trash2, Eye, FileText, Upload, MoreVertical, Plus, X, AlertCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -102,6 +102,17 @@ const AuctionsTable = forwardRef<
   useImperativeHandle(ref, () => ({
     handleGeneratePassedAuction
   }))
+
+  // Close dropdown on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActionMenuOpen(null)
+    }
+    if (actionMenuOpen) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [actionMenuOpen])
 
   // Helper function to get next month's first and last day
   const getNextMonthDates = () => {
@@ -624,6 +635,15 @@ const AuctionsTable = forwardRef<
                     
                     {actionMenuOpen === auction.id && (
                       <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10">
+                        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+                          <span className="text-xs font-medium text-gray-500">Actions</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setActionMenuOpen(null) }}
+                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                         <div className="py-1">
                           <button
                             onClick={() => {
@@ -865,7 +885,7 @@ const AuctionsTable = forwardRef<
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Default: Next month's first day
+                    Default: Next month&apos;s first day
                   </p>
                 </div>
 
@@ -881,7 +901,7 @@ const AuctionsTable = forwardRef<
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Default: Next month's last day
+                    Default: Next month&apos;s last day
                   </p>
                 </div>
               </div>
@@ -918,4 +938,4 @@ const AuctionsTable = forwardRef<
 
 AuctionsTable.displayName = 'AuctionsTable'
 
-export default AuctionsTable 
+export default AuctionsTable
