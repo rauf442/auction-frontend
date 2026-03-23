@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronUp, ChevronDown, Edit, Trash2, MoreVertical, Eye } from 'lucide-react'
+import { ChevronUp, ChevronDown, Edit, Trash2, MoreVertical, Eye, X } from 'lucide-react'
 import { Artwork, ArtworksAPI } from '@/lib/items-api'
 import { formatCurrency, getStatusColor, getStatusLabel } from '@/lib/items-api'
 import MediaRenderer from '@/components/ui/MediaRenderer'
@@ -45,15 +45,12 @@ export default function ItemsTable({
   const [auctionsByItem, setAuctionsByItem] = useState<Record<string, { id: number; short_name: string; long_name: string; status: string | null; settlement_date: string | null }[]>>({})
   const [loadingAuctions, setLoadingAuctions] = useState(false)
 
-  // ✅ FIX: Local mirror of items so image edits reflect immediately without a page refresh
   const [localItems, setLocalItems] = useState<Artwork[]>(items)
 
-  // ✅ FIX: Keep localItems in sync when the parent passes new items (pagination, filter, etc.)
   useEffect(() => {
     setLocalItems(items)
   }, [items])
 
-  // Image edit modal state
   const [imageEditModal, setImageEditModal] = useState<{
     isOpen: boolean
     itemId: string | null
@@ -68,7 +65,17 @@ export default function ItemsTable({
     itemTitle: ''
   })
 
-  // Fetch auctions mapping for current items
+  // Close dropdown on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenMenuId(null)
+    }
+    if (openMenuId) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [openMenuId])
+
   useEffect(() => {
     const fetchAuctions = async () => {
       try {
@@ -81,7 +88,6 @@ export default function ItemsTable({
         const mapping = await getAuctionsByItems(ids)
         setAuctionsByItem(mapping)
       } catch (e) {
-        // non-blocking
         console.error('Failed to load auctions for items', e)
       } finally {
         setLoadingAuctions(false)
@@ -90,7 +96,6 @@ export default function ItemsTable({
     fetchAuctions()
   }, [items])
 
-  // Helper function to get first two images from an item
   const getItemImages = (item: Artwork): string[] => {
     if (item.images && Array.isArray(item.images)) {
       return item.images.slice(0, 2).filter(url => url && url.trim())
@@ -110,27 +115,16 @@ export default function ItemsTable({
 
   const handleImageUpdate = async (newImageUrl: string | null, imageIndex: number) => {
     if (!imageEditModal.itemId) return
-
     try {
-      // Get current item from localItems
       const currentItem = localItems.find(item => item.id === imageEditModal.itemId)
       if (!currentItem || !currentItem.images) return
-
-      // Create updated images array
       const updatedImages = [...currentItem.images]
-
       if (newImageUrl === null) {
-        // Delete image
         updatedImages.splice(imageIndex, 1)
       } else {
-        // Replace image
         updatedImages[imageIndex] = newImageUrl
       }
-
-      // Save to DB
       await ArtworksAPI.updateArtwork(imageEditModal.itemId, { images: updatedImages })
-
-      // ✅ FIX: Update localItems immediately so the table reflects the change without a refresh
       setLocalItems(prev =>
         prev.map(item =>
           item.id === imageEditModal.itemId
@@ -138,13 +132,10 @@ export default function ItemsTable({
             : item
         )
       )
-
-      // Close modal
       setImageEditModal(prev => ({ ...prev, isOpen: false }))
-
     } catch (error) {
       console.error('Failed to update image:', error)
-      throw error // Re-throw to let the modal handle the error
+      throw error
     }
   }
 
@@ -218,80 +209,42 @@ export default function ItemsTable({
                   className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
                 />
               </th>
-
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <button
-                  onClick={() => handleSort('id')}
-                  className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer"
-                >
-                  <span>ID</span>
-                  <SortIcon field="id" />
+                <button onClick={() => handleSort('id')} className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer">
+                  <span>ID</span><SortIcon field="id" />
                 </button>
               </th>
-
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <button
-                  onClick={() => handleSort('title')}
-                  className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer"
-                >
-                  <span>Title</span>
-                  <SortIcon field="title" />
+                <button onClick={() => handleSort('title')} className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer">
+                  <span>Title</span><SortIcon field="title" />
                 </button>
               </th>
-
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                <button
-                  onClick={() => handleSort('category')}
-                  className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer"
-                >
-                  <span>Category</span>
-                  <SortIcon field="category" />
+                <button onClick={() => handleSort('category')} className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer">
+                  <span>Category</span><SortIcon field="category" />
                 </button>
               </th>
-
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                <button
-                  onClick={() => handleSort('low_est')}
-                  className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer"
-                >
-                  <span>Low Est</span>
-                  <SortIcon field="low_est" />
+                <button onClick={() => handleSort('low_est')} className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer">
+                  <span>Low Est</span><SortIcon field="low_est" />
                 </button>
               </th>
-
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                <button
-                  onClick={() => handleSort('high_est')}
-                  className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer"
-                >
-                  <span>High Est</span>
-                  <SortIcon field="high_est" />
+                <button onClick={() => handleSort('high_est')} className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer">
+                  <span>High Est</span><SortIcon field="high_est" />
                 </button>
               </th>
-
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                <button
-                  onClick={() => handleSort('start_price')}
-                  className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer"
-                >
-                  <span>Start Price</span>
-                  <SortIcon field="start_price" />
+                <button onClick={() => handleSort('start_price')} className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer">
+                  <span>Start Price</span><SortIcon field="start_price" />
                 </button>
               </th>
-
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <button
-                  onClick={() => handleSort('created_at')}
-                  className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer"
-                >
-                  <span>Created</span>
-                  <SortIcon field="created_at" />
+                <button onClick={() => handleSort('created_at')} className="flex items-center space-x-1 hover:text-gray-700 cursor-pointer">
+                  <span>Created</span><SortIcon field="created_at" />
                 </button>
               </th>
-
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
 
@@ -305,11 +258,7 @@ export default function ItemsTable({
               </tr>
             ) : (
               localItems.map((item) => (
-                <tr
-                  key={item.id}
-                  className={`hover:bg-gray-50 ${selectedItems.includes(item.id!) ? 'bg-blue-50' : ''
-                    }`}
-                >
+                <tr key={item.id} className={`hover:bg-gray-50 ${selectedItems.includes(item.id!) ? 'bg-blue-50' : ''}`}>
                   <td className="px-3 py-4 whitespace-nowrap">
                     <input
                       type="checkbox"
@@ -318,11 +267,7 @@ export default function ItemsTable({
                       className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
                     />
                   </td>
-
-                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {item.id}
-                  </td>
-
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.id}</td>
                   <td className="px-6 py-4 text-sm text-gray-900">
                     <div className="max-w-xs">
                       <div
@@ -332,33 +277,19 @@ export default function ItemsTable({
                       >
                         {item.title}
                       </div>
-                      <div className="text-gray-500 text-xs truncate">
-                        {item.brands?.name || item.brand_name || 'not assigned yet'}
-                      </div>
-                      {/* Auctions list under brand name */}
+                      <div className="text-gray-500 text-xs truncate">{item.brands?.name || item.brand_name || 'not assigned yet'}</div>
                       <div className="mt-1 text-[11px] text-gray-600">
                         {(() => {
                           const auctions = auctionsByItem[String(item.id)] || []
-                          if (loadingAuctions && auctions.length === 0) {
-                            return <span className="text-gray-400">Loading auctions…</span>
-                          }
-                          if (auctions.length === 0) {
-                            return <span className="text-gray-400">No auctions</span>
-                          }
+                          if (loadingAuctions && auctions.length === 0) return <span className="text-gray-400">Loading auctions…</span>
+                          if (auctions.length === 0) return <span className="text-gray-400">No auctions</span>
                           const names = auctions.map(a => a.short_name || a.long_name).filter(Boolean)
-                          return (
-                            <span title={names.join(', ')}>
-                              Auctions: {names.slice(0, 3).join(', ')}{names.length > 3 ? ` +${names.length - 3}` : ''}
-                            </span>
-                          )
+                          return <span title={names.join(', ')}>Auctions: {names.slice(0, 3).join(', ')}{names.length > 3 ? ` +${names.length - 3}` : ''}</span>
                         })()}
                       </div>
                       {(item.artist_id || item.school_id) && (
-                        <div className="text-gray-500 text-xs truncate">
-                          {item.artist_id ? 'Artist' : 'School'} selected
-                        </div>
+                        <div className="text-gray-500 text-xs truncate">{item.artist_id ? 'Artist' : 'School'} selected</div>
                       )}
-                      {/* Item Images */}
                       {(() => {
                         const images = getItemImages(item)
                         if (images.length > 0) {
@@ -397,37 +328,20 @@ export default function ItemsTable({
                       })()}
                     </div>
                   </td>
-
-                  <td className="px-3 py-4 text-sm text-gray-500 truncate" title={item.category || '-'}>
-                    {item.category || '-'}
-                  </td>
-
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatCurrency(item.low_est)}
-                  </td>
-
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatCurrency(item.high_est)}
-                  </td>
-
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {item.start_price ? formatCurrency(item.start_price) : '-'}
-                  </td>
-
+                  <td className="px-3 py-4 text-sm text-gray-500 truncate" title={item.category || '-'}>{item.category || '-'}</td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(item.low_est)}</td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(item.high_est)}</td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{item.start_price ? formatCurrency(item.start_price) : '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div>
-                      {item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
-                    </div>
+                    <div>{item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}</div>
                     <div className="mt-1">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white ${getStatusColor(item.status!)}`}>
                         {getStatusLabel(item.status!)}
                       </span>
                     </div>
                   </td>
-
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
-                      {/* More Actions Dropdown */}
                       <div className="relative">
                         <button
                           onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id!)}
@@ -438,24 +352,24 @@ export default function ItemsTable({
 
                         {openMenuId === item.id && (
                           <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+                              <span className="text-xs font-medium text-gray-500">Actions</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(null) }}
+                                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                             <div className="py-1">
-                              <button
-                                onClick={() => handlePreview(item.id!)}
-                                className="flex items-center w-full px-4 py-2 text-sm text-purple-600 hover:bg-gray-100 cursor-pointer"
-                              >
-                                Preview
+                              <button onClick={() => handlePreview(item.id!)} className="flex items-center w-full px-4 py-2 text-sm text-purple-600 hover:bg-gray-100 cursor-pointer">
+                                <Eye className="h-4 w-4 mr-2" />Preview
                               </button>
-                              <button
-                                onClick={() => handleEdit(item)}
-                                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                              >
-                                Edit
+                              <button onClick={() => handleEdit(item)} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+                                <Edit className="h-4 w-4 mr-2" />Edit
                               </button>
-                              <button
-                                onClick={() => handleDelete(item.id!)}
-                                className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100 cursor-pointer"
-                              >
-                                Delete
+                              <button onClick={() => handleDelete(item.id!)} className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100 cursor-pointer">
+                                <Trash2 className="h-4 w-4 mr-2" />Delete
                               </button>
                             </div>
                           </div>
@@ -470,15 +384,10 @@ export default function ItemsTable({
         </table>
       </div>
 
-      {/* Click outside to close menu */}
       {openMenuId && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setOpenMenuId(null)}
-        />
+        <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
       )}
 
-      {/* Image Edit Modal */}
       <ImageEditModal
         isOpen={imageEditModal.isOpen}
         onClose={() => setImageEditModal(prev => ({ ...prev, isOpen: false }))}
