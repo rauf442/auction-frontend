@@ -11,7 +11,7 @@ import MediaRenderer from '@/components/ui/MediaRenderer'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL}/api`
-  : 'http://localhost:3001/api'
+  : 'https://auction-backend-hjfa.onrender.com/api'
 
 interface Item {
   id: number
