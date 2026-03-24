@@ -73,6 +73,9 @@ export default function PrivateSaleInvoicePage() {
       setLoading(true)
       setError(null)
 
+      // Get token once at the top for all authenticated requests
+      const token = localStorage.getItem('token')
+
       if (entryMode === 'item' && itemIdParam) {
         // Load item details
         const itemResponse = await ArtworksAPI.getArtwork(itemIdParam)
@@ -82,7 +85,11 @@ export default function PrivateSaleInvoicePage() {
           setSelectedItemId(parseInt(itemIdParam))
 
           // Load auctions containing this item
-          const auctionsResponse = await fetch(`${API_BASE_URL}/auctions?page=1&limit=100`)
+          const auctionsResponse = await fetch(`${API_BASE_URL}/auctions?page=1&limit=100`, {
+            headers: {
+              ...(token && { 'Authorization': `Bearer ${token}` })
+            }
+          })
           
           if (auctionsResponse.ok) {
             const auctionsData = await auctionsResponse.json()
@@ -94,7 +101,11 @@ export default function PrivateSaleInvoicePage() {
         }
       } else if (entryMode === 'auction' && auctionIdParam) {
         // Load auction details
-        const auctionResponse = await fetch(`${API_BASE_URL}/auctions/${auctionIdParam}`)
+        const auctionResponse = await fetch(`${API_BASE_URL}/auctions/${auctionIdParam}`, {
+          headers: {
+            ...(token && { 'Authorization': `Bearer ${token}` })
+          }
+        })
         
         if (auctionResponse.ok) {
           const auctionData = await auctionResponse.json()
@@ -489,4 +500,3 @@ export default function PrivateSaleInvoicePage() {
     </div>
   )
 }
-
