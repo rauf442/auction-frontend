@@ -21,6 +21,7 @@ interface Item {
   high_est?: number
   status: string
   lot_num?: number
+  vendor_id?: number | null  // ← added vendor_id
 }
 
 interface Auction {
@@ -34,7 +35,7 @@ interface Auction {
 export default function PrivateSaleInvoicePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  
+
   // Determine entry mode
   const itemIdParam = searchParams?.get('item_id')
   const auctionIdParam = searchParams?.get('auction_id')
@@ -56,6 +57,7 @@ export default function PrivateSaleInvoicePage() {
   const [selectedAuctionId, setSelectedAuctionId] = useState<number | null>(null)
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null)
+  const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null) // ← added vendor state
   const [salePrice, setSalePrice] = useState<string>('')
 
   useEffect(() => {
@@ -64,9 +66,26 @@ export default function PrivateSaleInvoicePage() {
       setLoading(false)
       return
     }
-    
+
     loadInitialData()
   }, [entryMode, itemIdParam, auctionIdParam])
+
+  // Auto-populate vendor when item is selected
+  useEffect(() => {
+    if (!selectedItemId) return
+
+    // Check in items list (auction mode)
+    const foundItem = items.find(i => i.id === selectedItemId)
+    if (foundItem?.vendor_id) {
+      setSelectedVendorId(foundItem.vendor_id)
+      return
+    }
+
+    // Check single item (item mode)
+    if (item?.vendor_id) {
+      setSelectedVendorId(item.vendor_id)
+    }
+  }, [selectedItemId, items, item])
 
   const loadInitialData = async () => {
     try {
@@ -79,7 +98,7 @@ export default function PrivateSaleInvoicePage() {
       if (entryMode === 'item' && itemIdParam) {
         // Load item details
         const itemResponse = await ArtworksAPI.getArtwork(itemIdParam)
-        
+
         if (itemResponse.success && itemResponse.data) {
           setItem(itemResponse.data as any)
           setSelectedItemId(parseInt(itemIdParam))
@@ -90,7 +109,7 @@ export default function PrivateSaleInvoicePage() {
               ...(token && { 'Authorization': `Bearer ${token}` })
             }
           })
-          
+
           if (auctionsResponse.ok) {
             const auctionsData = await auctionsResponse.json()
             const relevantAuctions = (auctionsData.auctions || []).filter((auction: Auction) =>
@@ -106,7 +125,7 @@ export default function PrivateSaleInvoicePage() {
             ...(token && { 'Authorization': `Bearer ${token}` })
           }
         })
-        
+
         if (auctionResponse.ok) {
           const auctionData = await auctionResponse.json()
           setAuctions([auctionData])
@@ -132,7 +151,8 @@ export default function PrivateSaleInvoicePage() {
                     low_est: item.low_est,
                     high_est: item.high_est,
                     status: item.status,
-                    lot_num: lotNumber
+                    lot_num: lotNumber,
+                    vendor_id: item.vendor_id || null // ← include vendor_id
                   }
                 })
                 // Sort items by lot number
@@ -143,7 +163,7 @@ export default function PrivateSaleInvoicePage() {
         }
       }
 
-      // Load all clients for selection
+      // Load all clients for selection (used for both buyer and vendor dropdowns)
       const clientsData = await fetchClients({ page: 1, limit: 1000 })
       if (clientsData.success) {
         setClients(clientsData.data || [])
@@ -207,6 +227,27 @@ export default function PrivateSaleInvoicePage() {
       }
 
       const data = await response.json()
+
+      // ── Assign vendor to item if a vendor was selected ────────────────────
+      if (selectedVendorId && selectedItemId) {
+        try {
+          await fetch(`${API_BASE_URL}/items/assign-vendor`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` })
+            },
+            body: JSON.stringify({
+              item_ids: [selectedItemId],
+              vendor_id: selectedVendorId,
+            })
+          })
+        } catch (vendorErr) {
+          // Non-blocking: log but don't fail the invoice creation
+          console.warn('Vendor assignment failed:', vendorErr)
+        }
+      }
+
       setSuccess(true)
 
       // Navigate to invoice view after short delay
@@ -274,8 +315,17 @@ export default function PrivateSaleInvoicePage() {
       description: `${client.email}${client.buyer_premium ? ` • Premium: ${client.buyer_premium}%` : ''}`
     }))
 
+  // Vendor options — same clients list, no buyer_premium needed
+  const vendorOptions = clients
+    .filter(client => client.id !== undefined)
+    .map(client => ({
+      value: client.id!.toString(),
+      label: client.company_name || `${client.first_name} ${client.last_name}`,
+      description: client.email || ''
+    }))
+
   const selectedClient = clients.find(c => c.id === selectedClientId)
-  const calculatedPremium = selectedClient && salePrice 
+  const calculatedPremium = selectedClient && salePrice
     ? (parseFloat(salePrice) * (selectedClient.buyer_premium || 0)) / 100
     : 0
   const totalAmount = salePrice ? parseFloat(salePrice) + calculatedPremium : 0
@@ -436,6 +486,23 @@ export default function PrivateSaleInvoicePage() {
               placeholder="Choose a buyer..."
               inputPlaceholder="Search buyers by name or email..."
             />
+          </div>
+
+          {/* Vendor Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Assign Vendor <span className="text-gray-400 text-xs font-normal">(Optional)</span>
+            </label>
+            <SearchableSelect
+              options={vendorOptions}
+              value={selectedVendorId?.toString() || null}
+              onChange={(value) => setSelectedVendorId(value ? parseInt(value as string) : null)}
+              placeholder="Choose a vendor..."
+              inputPlaceholder="Search vendors by name or email..."
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              The consignor / seller of this item. Auto-filled if already assigned to the item.
+            </p>
           </div>
 
           {/* Sale Price Input */}
