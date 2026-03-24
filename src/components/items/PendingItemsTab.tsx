@@ -9,6 +9,7 @@ interface PendingRecord {
     client_info?: any;
     items: any[];
     created_at?: string;
+    brand_code?: string | null; // ← added brand identifier
 }
 
 interface ActionLoading {
@@ -187,7 +188,23 @@ export default function PendingItemsTab() {
                             <div key={p.id} className="border rounded-lg p-4 bg-white shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <div className="font-semibold text-gray-900">Submission #{p.id}</div>
+                                        {/* ── Submission title + brand badge ── */}
+                                        <div className="flex items-center gap-2">
+                                            <div className="font-semibold text-gray-900">Submission #{p.id}</div>
+                                            {/* Brand identifier badge */}
+                                            {p.brand_code && (
+                                                <span style={{
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    padding: '2px 8px',
+                                                    borderRadius: '4px',
+                                                    background: p.brand_code === 'AURUM' ? '#FEF3C7' : '#DBEAFE',
+                                                    color: p.brand_code === 'AURUM' ? '#92400E' : '#1E40AF',
+                                                }}>
+                                                    {p.brand_code}
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="text-xs text-gray-500 mt-0.5">
                                             Status: <span className="font-medium">{p.status || "submitted"}</span>
                                             {p.created_at ? ` • ${new Date(p.created_at).toLocaleString()}` : ""}
