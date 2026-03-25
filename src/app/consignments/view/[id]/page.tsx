@@ -49,7 +49,8 @@ import {
   ArrowLeft,
   Download,
   Share2,
-  Printer
+  Printer,
+  X
 } from 'lucide-react'
 
 interface ConsignmentStats {
@@ -136,6 +137,21 @@ export default function ConsignmentViewPage() {
     
     if (consignmentId) load()
   }, [consignmentId])
+useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setShowPDFOptions(false)
+    }
+  }
+
+  if (showPDFOptions) {
+    document.addEventListener('keydown', handleKeyDown)
+  }
+
+  return () => {
+    document.removeEventListener('keydown', handleKeyDown)
+  }
+}, [showPDFOptions])
 
   const getStatusIcon = (status?: string) => {
     switch (status) {
@@ -303,8 +319,25 @@ export default function ConsignmentViewPage() {
               </button>
               
               {showPDFOptions && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 border border-gray-200" onClick={(e) => e.stopPropagation()}>
-                  <div className="py-1">
+  <div
+    className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 border border-gray-200"
+    onClick={(e) => e.stopPropagation()}
+  >
+    {/* ✅ NEW HEADER WITH CLOSE BUTTON */}
+    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+      <span className="text-xs font-semibold text-gray-500 uppercase">
+        PDF Options
+      </span>
+
+      <button
+        onClick={() => setShowPDFOptions(false)}
+        className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+
+    <div className="py-1">
                     {/* Only show PDF options if all required data is loaded */}
                     {client && consignment && !loading ? (
                       <>
