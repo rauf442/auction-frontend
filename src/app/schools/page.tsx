@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Plus, Download, Filter, CheckCircle, PauseCircle, Archive } from 'lucide-react'
 import { School, SchoolsAPI, SchoolsResponse } from '@/lib/schools-api'
@@ -87,47 +88,79 @@ export default function SchoolsPage() {
     }
   }
 
-  const handleDeleteSchool = async (schoolId: string) => {
-    if (!confirm('Are you sure you want to archive this school?')) return
+const handleDeleteSchool = async (schoolId: string) => {
+  toast.warning('Are you sure you want to archive this school?', {
+    action: {
+      label: 'Archive',
+      onClick: async () => {
+        try {
+          await SchoolsAPI.deleteSchool(schoolId)
+          loadSchools() // Reload the list
+          toast.success('School archived successfully')
+        } catch (err: any) {
+          setError(err.message || 'Failed to archive school')
+        }
+      }
+    },
+    cancel: {
+      label: 'Cancel',
+      onClick: () => {}
+    },
+    duration: 10000 // 10 seconds to decide
+  })
+}
 
-    try {
-      await SchoolsAPI.deleteSchool(schoolId)
-      loadSchools() // Reload the list
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete school')
-    }
-  }
-
-  const handleBulkAction = async (action: string) => {
+  const handleBulkAction = async (actionType: string) => {
     if (selectedSchools.length === 0) return
 
-    try {
-      let confirmMessage = ''
-      switch (action) {
-        case 'delete':
-          confirmMessage = `Are you sure you want to archive ${selectedSchools.length} school(s)?`
-          break
-        case 'activate':
-          confirmMessage = `Are you sure you want to activate ${selectedSchools.length} school(s)?`
-          break
-        case 'inactive':
-          confirmMessage = `Are you sure you want to set ${selectedSchools.length} school(s) to inactive?`
-          break
+    const messages: Record<string, { message: string; label: string; successMessage: string }> = {
+      delete: {
+        message: `Archive ${selectedSchools.length} school(s)?`,
+        label: 'Archive',
+        successMessage: 'Schools archived successfully'
+      },
+      activate: {
+        message: `Activate ${selectedSchools.length} school(s)?`,
+        label: 'Activate',
+        successMessage: 'Schools activated successfully'
+      },
+      inactive: {
+        message: `Set ${selectedSchools.length} school(s) to inactive?`,
+        label: 'Set Inactive',
+        successMessage: 'Schools set to inactive successfully'
       }
-
-      if (!confirm(confirmMessage)) return
-
-      if (action === 'delete') {
-        await SchoolsAPI.bulkAction('delete', selectedSchools)
-      } else {
-        await SchoolsAPI.bulkAction('update_status', selectedSchools, { status: action === 'activate' ? 'active' : 'inactive' })
-      }
-
-      setSelectedSchools([])
-      loadSchools()
-    } catch (err: any) {
-      setError(err.message || 'Failed to perform bulk action')
     }
+
+    const config = messages[actionType]
+    if (!config) return
+
+    toast.warning(config.message, {
+      action: {
+        label: config.label,
+        onClick: async () => {
+          try {
+            if (actionType === 'delete') {
+              await SchoolsAPI.bulkAction('delete', selectedSchools)
+            } else {
+              await SchoolsAPI.bulkAction('update_status', selectedSchools, { 
+                status: actionType === 'activate' ? 'active' : 'inactive' 
+              })
+            }
+
+            setSelectedSchools([])
+            loadSchools()
+            toast.success(config.successMessage)
+          } catch (err: any) {
+            setError(err.message || 'Failed to perform bulk action')
+          }
+        }
+      },
+      cancel: {
+        label: 'Cancel',
+        onClick: () => {}
+      },
+      duration: 10000
+    })
   }
 
   const handleExportCSV = async () => {
