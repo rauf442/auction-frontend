@@ -42,7 +42,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   </div>
         {/* Floating Chat Widget - Available on all authenticated pages */}
         <FloatingChat />
-        <Toaster position="top-right" richColors />
+        <Toaster position="top-center" richColors />
       </div>
     </AuthGuard>
   )
