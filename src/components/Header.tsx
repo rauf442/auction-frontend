@@ -37,7 +37,20 @@ export default function Header() {
       }
     }
   }, [])
+useEffect(() => {
+  const handleEsc = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      setShowCreateDropdown(false)
+      setShowAccountDropdown(false)
+    }
+  }
 
+  document.addEventListener('keydown', handleEsc)
+
+  return () => {
+    document.removeEventListener('keydown', handleEsc)
+  }
+}, [])
   const handleSignOut = async () => {
     try {
       await apiClient.logout();
@@ -99,31 +112,43 @@ export default function Header() {
           <div className="relative">
             <button
               onClick={() => setShowCreateDropdown(!showCreateDropdown)}
-              className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               <span className="hidden md:inline text-sm font-medium">Create</span>
               <ChevronDown className="h-4 w-4" />
             </button>
 
-            {showCreateDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                {createMenuItems.map((item) => {
-                  const IconComponent = item.icon
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      onClick={() => setShowCreateDropdown(false)}
-                    >
-                      <IconComponent className="h-4 w-4 text-gray-400" />
-                      <span>{item.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
+{showCreateDropdown && (
+  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+    
+    {/* Header with Close */}
+    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+      <span className="text-sm font-medium text-gray-700">Create</span>
+      <button
+        onClick={() => setShowCreateDropdown(false)}
+        className="text-gray-400 hover:text-gray-600 text-sm cursor-pointer"
+      >
+        ✕
+      </button>
+    </div>
+
+    {createMenuItems.map((item) => {
+      const IconComponent = item.icon
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          className="flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          onClick={() => setShowCreateDropdown(false)}
+        >
+          <IconComponent className="h-4 w-4 text-gray-400" />
+          <span>{item.label}</span>
+        </Link>
+      )
+    })}
+  </div>
+)}
           </div>
 
           {/* Account dropdown */}
@@ -149,13 +174,25 @@ export default function Header() {
             </button>
 
             {showAccountDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                {currentUser && (
-                  <div className="px-4 py-3 border-b border-gray-100">
-                    <div className="text-sm font-medium text-gray-900">{getUserDisplayName()}</div>
-                    <div className="text-sm text-gray-500">{currentUser.email}</div>
-                  </div>
-                )}
+  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+
+    {/* Header with Close */}
+    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+      <span className="text-sm font-medium text-gray-700">Account</span>
+      <button
+        onClick={() => setShowAccountDropdown(false)}
+        className="text-gray-400 hover:text-gray-600 text-sm cursor-pointer"
+      >
+        ✕
+      </button>
+    </div>
+
+    {currentUser && (
+      <div className="px-4 py-3 border-b border-gray-100">
+        <div className="text-sm font-medium text-gray-900">{getUserDisplayName()}</div>
+        <div className="text-sm text-gray-500">{currentUser.email}</div>
+      </div>
+    )}
                 <Link
                   href="/account"
                   className="flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
