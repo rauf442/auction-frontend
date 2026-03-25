@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import ConsignmentsTable from '@/components/consignments/ConsignmentsTable'
 import CSVUpload from '@/components/consignments/CSVUpload'
 import ConsignmentPDFGeneratorBackend from '@/components/consignments/ConsignmentPDFGeneratorBackend'
 import ConsignmentGoogleSheetsSync from '@/components/consignments/ConsignmentGoogleSheetsSync'
-import { Plus, Download, Upload, Filter, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Download, Upload, Filter, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react'
 import { getConsignments, exportConsignmentsCSV } from '@/lib/consignments-api'
 import { formatClientDisplay } from '@/lib/clients-api'
 import SearchableSelect from '@/components/ui/SearchableSelect'
@@ -56,6 +56,117 @@ const convertConsignmentFormat = (consignment: any) => {
     created: consignment.created_at ? new Date(consignment.created_at).toLocaleDateString() : '',
     signed: consignment.is_signed || false
   }
+}
+
+function CustomDropdown({
+  label,
+  value,
+  options,
+  onChange,
+  defaultValue
+}: {
+  label: string
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+  defaultValue: string
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const selectedLabel =
+    options.find(o => o.value === value)?.label || options[0]?.label
+
+  const isFiltered = value !== defaultValue
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+        {label}
+      </label>
+
+      <div
+        className={`flex items-center justify-between w-full px-3 py-2 rounded-2xl border cursor-pointer bg-white ${
+          value !== defaultValue ? 'border-teal-500 bg-teal-50' : 'border-slate-200'
+        }`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="text-sm truncate">
+          {selectedLabel}
+        </span>
+
+        <div className="flex items-center gap-1 ml-2">
+          {value !== defaultValue && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onChange(defaultValue)
+                setIsOpen(false)
+              }}
+              className="p-0.5 rounded-full hover:bg-teal-200 text-teal-600"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+
+          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {label}
+            </span>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="py-1 max-h-48 overflow-y-auto">
+            {options.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => {
+                  onChange(option.value)
+                  setIsOpen(false)
+                }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-teal-50 ${
+                  value === option.value
+                    ? 'bg-teal-50 text-teal-700 font-medium'
+                    : 'text-gray-700'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function ConsignmentsPage() {
@@ -362,19 +473,20 @@ export default function ConsignmentsPage() {
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                >
-                  <option value="all">All</option>
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="archived">Archived</option>
-                </select>
+<CustomDropdown
+  label="Status"
+  value={statusFilter}
+  onChange={(val) => setStatusFilter(val as any)}
+  defaultValue="all"
+  options={[
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'archived', label: 'Archived' },
+  ]}
+/>
               </div>
               <div className="flex gap-2">
                 <button onClick={applyFilters} className="flex-1 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
