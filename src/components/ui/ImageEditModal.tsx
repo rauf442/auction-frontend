@@ -242,15 +242,6 @@ const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
   })
 }
 
-  const handleCropPreview = useCallback(() => {
-    if (!completedCrop || !imgRef.current) return
-    try {
-      const canvas = getCroppedCanvas(imgRef.current, completedCrop, rotation, brightness)
-      setCroppedImageUrl(canvas.toDataURL('image/jpeg', 0.9))
-    } catch (error) {
-      console.error('Failed to generate preview:', error)
-    }
-  }, [completedCrop, rotation, brightness])
   // Auto-update preview when brightness, rotation or crop changes
 useEffect(() => {
   if (!completedCrop || !imgRef.current) return
@@ -467,15 +458,6 @@ useEffect(() => {
   <span>0°</span><span>180°</span><span>360°</span>
 </div>
                       </div>
-
-                      <Button
-                        onClick={handleCropPreview}
-                        variant="outline"
-                        className="w-full flex items-center gap-2 mb-2"
-                        disabled={!completedCrop || isDownloadingImage}
-                      >
-                        Preview Crop
-                      </Button>
 
                       <Button onClick={handleReset} variant="outline" className="w-full flex items-center gap-2" disabled={isUploading}>
                         <RefreshCw className="h-4 w-4" />Reset
