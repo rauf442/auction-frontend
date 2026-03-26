@@ -474,7 +474,9 @@ const [selectedSubtype, setSelectedSubtype] = useState<string | null>(null)
 
   // Use auctions as-is since sorting is handled by backend
   const sortedAuctions = auctions
-
+const selectedSubtypeLabel = AUCTION_SUBTYPES.find(
+  s => s.value === selectedSubtype
+)?.label
   return (
     <div className="overflow-hidden">
       <div className="overflow-x-auto">
@@ -960,7 +962,7 @@ const [selectedSubtype, setSelectedSubtype] = useState<string | null>(null)
         <ul className="list-disc list-inside">
           <li>Auctions: {selectedAuctionsForPassed.length}</li>
           <li>Total Unsold Items: {totalUnsoldCount}</li>
-          <li>Type: {selectedSubtype}</li>
+          <li>Type: {selectedSubtypeLabel}</li>
           <li>Name: {passedAuctionLongName}</li>
         </ul>
       </div>
