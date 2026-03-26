@@ -23,6 +23,7 @@ import ArtworkDescriptionSection from '@/components/items/common/ArtworkDescript
 import DimensionsSection from '@/components/items/common/DimensionsSection'
 import CertificationSection from '@/components/items/common/CertificationSection'
 import AISuggestionsModal from '@/components/items/AISuggestionsModal'
+import AIAutoFillModal from './AIAutoFillModal'
 
 interface ItemFormProps {
   itemId?: string
@@ -251,6 +252,8 @@ export default function ItemForm({ itemId, initialData, mode, onSave, onCancel }
   const [users, setUsers] = useState<User[]>([])
   const [loadingArtistsSchools, setLoadingArtistsSchools] = useState(false)
   const [loadingAuctions, setLoadingAuctions] = useState(false)
+  const [showAIModal, setShowAIModal] = useState(false)
+const [aiFilled, setAiFilled] = useState(false)
 
   // Get brand ID from brand code
   const getBrandId = (brandCode: string): number | undefined => {
@@ -814,14 +817,14 @@ export default function ItemForm({ itemId, initialData, mode, onSave, onCancel }
       artwork_subject: aiData.artwork_subject || '',
       signature_placement: aiData.signature_placement || '',
       medium: aiData.materials || '', // Use materials as medium initially
-      include_artist_description: aiData.include_artist_description !== undefined ? aiData.include_artist_description : true,
-      include_artist_key_description: aiData.include_artist_key_description !== undefined ? aiData.include_artist_key_description : true,
-      include_artist_biography: aiData.include_artist_biography || false,
-      include_artist_notable_works: aiData.include_artist_notable_works || false,
-      include_artist_major_exhibitions: aiData.include_artist_major_exhibitions || false,
-      include_artist_awards_honors: aiData.include_artist_awards_honors || false,
-      include_artist_market_value_range: aiData.include_artist_market_value_range || false,
-      include_artist_signature_style: aiData.include_artist_signature_style || false,
+      include_artist_description: true,
+include_artist_key_description: true,
+include_artist_biography: false,
+include_artist_notable_works: false,
+include_artist_major_exhibitions: false,
+include_artist_awards_honors: false,
+include_artist_market_value_range: false,
+include_artist_signature_style: false,
       condition_report: aiData.condition_report || '',
       gallery_certification: aiData.gallery_certification || false,
       gallery_certification_file: aiData.gallery_certification_file || '',
@@ -934,6 +937,29 @@ export default function ItemForm({ itemId, initialData, mode, onSave, onCancel }
     // Clear validation errors when user starts typing
     setValidationErrors([])
   }
+  const handleAIFill = (data: Record<string, any>, images: { file: File; preview: string }[]) => {
+  // Apply AI data to form fields
+  Object.entries(data).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      if (['low_est', 'high_est', 'start_price', 'reserve'].includes(key)) {
+        handleInputChange(key, value.toString())
+      } else if (typeof value === 'boolean') {
+        handleInputChange(key, value)
+      } else {
+        handleInputChange(key, String(value))
+      }
+    }
+  })
+
+  // Handle images from modal
+  images.forEach(({ preview, file }, index) => {
+    handleImageChange(index, preview, file)
+  })
+
+  setAiFilled(true)
+  setShowAIModal(false)
+  toast.success('Form auto-filled with AI data. Please review and adjust.')
+}
 
   const handleImageChange = (index: number, url: string, file?: File) => {
     console.log('handleImageChange', index, url, file)
@@ -1400,18 +1426,31 @@ export default function ItemForm({ itemId, initialData, mode, onSave, onCancel }
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* AI Generation Button - Only show in edit mode when first image exists */}
-          {mode === 'edit' && formData.images[0] && formData.images[0].trim() !== '' && (
-            <button
-              type="button"
-              onClick={handleAIGeneration}
-              disabled={aiLoading}
-              className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm hover:shadow-md"
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              {aiLoading ? 'Analyzing...' : 'AI Generate'}
-            </button>
-          )}
+  {/* AI Auto-Fill - Create mode only */}
+  {mode === 'create' && (
+    <button
+      type="button"
+      onClick={() => setShowAIModal(true)}
+      className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 shadow-sm hover:shadow-md"
+    >
+      <Sparkles className="h-4 w-4 mr-2" />
+      AI Auto-Fill
+      {aiFilled && <span className="ml-1.5 w-2 h-2 rounded-full bg-green-400 inline-block" />}
+    </button>
+  )}
+
+  {/* AI Generate - Edit mode only (your existing code) */}
+  {mode === 'edit' && formData.images[0] && formData.images[0].trim() !== '' && (
+    <button
+      type="button"
+      onClick={handleAIGeneration}
+      disabled={aiLoading}
+      className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm hover:shadow-md"
+    >
+      <Sparkles className="h-4 w-4 mr-2" />
+      {aiLoading ? 'Analyzing...' : 'AI Generate'}
+    </button>
+  )}
           
           <button
             type="button"
@@ -1513,6 +1552,20 @@ export default function ItemForm({ itemId, initialData, mode, onSave, onCancel }
           {/* Basic Info Tab */}
           {activeTab === 'basic' && (
             <div className="space-y-6">
+              {/* AI Filled Success Message */}
+    {aiFilled && (
+      <div className="flex items-center space-x-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+        <Sparkles className="h-4 w-4 text-purple-600 flex-shrink-0" />
+        <p className="text-sm text-purple-700">Fields were auto-filled by AI. Please review and adjust as needed.</p>
+        <button 
+          type="button" 
+          onClick={() => setAiFilled(false)} 
+          className="ml-auto text-purple-400 hover:text-purple-600"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    )}
               {/* Client & Consignment Selection Section */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-blue-900 mb-4">Client & Consignment Information</h3>
@@ -2095,6 +2148,13 @@ export default function ItemForm({ itemId, initialData, mode, onSave, onCancel }
         error={aiError}
         onApplySuggestions={handleApplyAISuggestions}
       />
+      {/* AI Auto-Fill Modal */}
+{mode === 'create' && showAIModal && (
+  <AIAutoFillModal 
+    onClose={() => setShowAIModal(false)} 
+    onFill={handleAIFill} 
+  />
+)}
     </div>
   )
 } 
