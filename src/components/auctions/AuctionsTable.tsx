@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { AUCTION_SUBTYPES } from '@/lib/constants'
 import { generatePassedAuctionBulk, getBrandAuctionCounts, getAuctionUnsoldCounts, type Brand } from '@/lib/auctions-api'
-import { toast } from 'sonner'
 
 interface Auction {
   id: number
@@ -89,8 +88,6 @@ const AuctionsTable = forwardRef<
   const [selectedAuctionsForPassed, setSelectedAuctionsForPassed] = useState<Auction[]>([])
   const [generatingPassedAuction, setGeneratingPassedAuction] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
-const [selectedSubtype, setSelectedSubtype] = useState<string | null>(null)
   const [passedAuctionShortName, setPassedAuctionShortName] = useState('')
   const [passedAuctionLongName, setPassedAuctionLongName] = useState('')
   const [passedAuctionStartDate, setPassedAuctionStartDate] = useState('')
@@ -384,12 +381,10 @@ const [selectedSubtype, setSelectedSubtype] = useState<string | null>(null)
       setGenerateError(null)
 
       // Show success message (you might want to add a toast notification here)
-      toast.success('Passed auction created successfully')
+      console.log('Successfully created passed auction:', newAuction)
 
       // Refresh the page or reload auctions
-      setTimeout(() => {
-  window.location.reload()
-}, 1000)
+      window.location.reload()
 
     } catch (error) {
       console.error('Error generating passed auction:', error)
@@ -398,13 +393,6 @@ const [selectedSubtype, setSelectedSubtype] = useState<string | null>(null)
       setGeneratingPassedAuction(false)
     }
   }
-  const handleConfirmCreatePassedAuction = async () => {
-  if (!selectedSubtype) return
-
-  await handlePassedAuctionSubtypeSelect(selectedSubtype)
-  setConfirmModalOpen(false)
-  setSelectedSubtype(null)
-}
 
   const handleSort = (field: SortField) => {
     if (onSort) {
@@ -474,9 +462,7 @@ const [selectedSubtype, setSelectedSubtype] = useState<string | null>(null)
 
   // Use auctions as-is since sorting is handled by backend
   const sortedAuctions = auctions
-const selectedSubtypeLabel = AUCTION_SUBTYPES.find(
-  s => s.value === selectedSubtype
-)?.label
+
   return (
     <div className="overflow-hidden">
       <div className="overflow-x-auto">
@@ -926,10 +912,7 @@ const selectedSubtypeLabel = AUCTION_SUBTYPES.find(
                 {AUCTION_SUBTYPES.map((subtype) => (
                   <button
                     key={subtype.value}
-                    onClick={() => {
-  setSelectedSubtype(subtype.value)
-  setConfirmModalOpen(true)
-}}
+                    onClick={() => handlePassedAuctionSubtypeSelect(subtype.value)}
                     disabled={generatingPassedAuction}
                     className="w-full p-3 text-left border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
@@ -949,42 +932,6 @@ const selectedSubtypeLabel = AUCTION_SUBTYPES.find(
           </div>
         </div>
       )}
-      {confirmModalOpen && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-    <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-      
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        Confirm Auction Creation
-      </h3>
-
-      <div className="text-sm text-gray-600 space-y-2 mb-4">
-        <p>You are about to create a passed auction with:</p>
-        <ul className="list-disc list-inside">
-          <li>Auctions: {selectedAuctionsForPassed.length}</li>
-          <li>Total Unsold Items: {totalUnsoldCount}</li>
-          <li>Type: {selectedSubtypeLabel}</li>
-          <li>Name: {passedAuctionLongName}</li>
-        </ul>
-      </div>
-
-      <div className="flex justify-end gap-3">
-        <button
-          onClick={() => setConfirmModalOpen(false)}
-          className="px-4 py-2 border rounded-md text-sm"
-        >
-          Cancel
-        </button>
-
-        <button
-          onClick={handleConfirmCreatePassedAuction}
-          className="px-4 py-2 bg-teal-600 text-white rounded-md text-sm"
-        >
-          Confirm & Create
-        </button>
-      </div>
-    </div>
-  </div>
-)}
     </div>
   )
 })
