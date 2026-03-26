@@ -4,7 +4,7 @@
 import React, { useState, useRef } from 'react'
 import { toast } from 'sonner'
 
-import { X, Upload, Eye, Trash2, Sparkles, Check, Loader, Edit3 } from 'lucide-react'
+import { X, Upload, Eye, Trash2, Sparkles, Check, Loader, Edit3, ImageIcon } from 'lucide-react'
 import { syncArtworksToGoogleSheet } from '@/lib/google-sheets-api'
 import { useBrand } from '@/lib/brand-context'
 import ItemForm from './ItemForm'
@@ -26,6 +26,12 @@ interface FolderItem {
   images: ImageFile[]
   generated?: boolean
   aiData?: any
+  selectedImageIds?: Set<string>
+}
+
+interface GeneratedResult {
+  _folderId: string  // Track by folder ID, not reference equality
+  [key: string]: any
 }
 
 interface AIBulkGenerationModalProps {
@@ -39,10 +45,12 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState<'select' | 'preview' | 'generating' | 'complete' | 'edit' | 'preview-dialog'>('select')
   const [generationProgress, setGenerationProgress] = useState(0)
-  const [generatedResults, setGeneratedResults] = useState<any[]>([])
+  const [generatedResults, setGeneratedResults] = useState<GeneratedResult[]>([])
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null)
   const [previewingItemIndex, setPreviewingItemIndex] = useState<number | null>(null)
-  // Image Edit Modal State
+
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+
   const [imageEditModal, setImageEditModal] = useState<{
     isOpen: boolean
     imageUrl: string
@@ -61,24 +69,16 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
   // Get previous step for navigation
   const getPreviousStep = (): string | null => {
     switch (currentStep) {
-      case 'select':
-        return null // Close modal
-      case 'preview':
-        return 'select'
-      case 'generating':
-        return 'preview'
-      case 'complete':
-        return 'preview'
-      case 'edit':
-        return 'complete'
-      case 'preview-dialog':
-        return 'complete'
-      default:
-        return 'select'
+      case 'select': return null
+      case 'preview': return 'select'
+      case 'generating': return 'preview'
+      case 'complete': return 'preview'
+      case 'edit': return 'complete'
+      case 'preview-dialog': return 'complete'
+      default: return 'select'
     }
   }
 
-  // Handle close button - navigate to previous state or close modal
   const handleClose = () => {
     const previousStep = getPreviousStep()
     if (previousStep) {
@@ -88,35 +88,61 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
     }
   }
 
-  // Handle folder/file selection with support for multiple folders
+  // ── Find folder by ID (safe, no reference equality) ──────────────────────
+  const getFolderById = (folderId: string): FolderItem | undefined =>
+    selectedFolders.find(f => f.id === folderId)
+
+  // ── Toggle image selection ────────────────────────────────────────────────
+  const toggleImageSelection = (folderId: string, imageId: string) => {
+    setSelectedFolders(prev => prev.map(folder => {
+      if (folder.id !== folderId) return folder
+      const selected = new Set(folder.selectedImageIds || folder.images.map(img => img.id))
+      const primaryImageId = folder.images[0]?.id
+      if (selected.has(imageId)) {
+        if (imageId === primaryImageId) {
+          toast.error('Cannot deselect the primary image used for AI analysis')
+          return folder
+        }
+        selected.delete(imageId)
+      } else {
+        selected.add(imageId)
+      }
+      return { ...folder, selectedImageIds: selected }
+    }))
+  }
+
+  const isImageSelected = (folder: FolderItem, imageId: string): boolean => {
+    if (!folder.selectedImageIds) return true
+    return folder.selectedImageIds.has(imageId)
+  }
+
+  const getSelectedCount = (folder: FolderItem): number => {
+    if (!folder.selectedImageIds) return folder.images.length
+    return folder.selectedImageIds.size
+  }
+
+  // ── File selection ────────────────────────────────────────────────────────
   const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (!files || files.length === 0) return
 
     const folderMap = new Map<string, ImageFile[]>()
 
-    // Process all selected files and group by subfolder
     Array.from(files).forEach((file, index) => {
       if (!file.type.startsWith('image/')) return
 
-      // Extract folder path - for folder selection, use the directory structure
       const path = (file as any).webkitRelativePath || file.name
       const pathParts = path.split('/')
-      
-      // For folder uploads: ParentFolder/SubfolderA/image.jpg -> use SubfolderA
-      // For individual files: use auto-generated folder names
+
       let folderName: string
       if (pathParts.length > 2) {
-        // Has parent folder and subfolder - use subfolder as inventory item
         folderName = `${pathParts[0]}/${pathParts[1]}`
       } else if (pathParts.length > 1) {
-        // Direct folder upload - use folder name
         folderName = pathParts[0]
       } else {
-        // Individual files - group them
         folderName = `individual-item-${Math.floor(index / 1) + 1}`
       }
-      
+
       const imageFile: ImageFile = {
         id: `${Date.now()}-${index}`,
         file,
@@ -126,16 +152,12 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
         generated: false
       }
 
-      if (!folderMap.has(folderName)) {
-        folderMap.set(folderName, [])
-      }
+      if (!folderMap.has(folderName)) folderMap.set(folderName, [])
       folderMap.get(folderName)!.push(imageFile)
     })
 
-    // Convert to FolderItem objects
     const folderItems: FolderItem[] = Array.from(folderMap.entries())
       .sort(([a], [b]) => {
-        // Extract numbers from folder names for proper sorting
         const getNumber = (name: string) => {
           const match = name.match(/(\d+)/)
           return match ? parseInt(match[1]) : 0
@@ -143,14 +165,13 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
         return getNumber(a) - getNumber(b)
       })
       .map(([folderName, images]) => {
-        // Sort images within each folder
         images.sort((a, b) => a.name.localeCompare(b.name))
-        
         return {
           id: `folder-${Date.now()}-${folderName}`,
           folderName,
           images,
-          generated: false
+          generated: false,
+          selectedImageIds: new Set(images.map(img => img.id))
         }
       })
 
@@ -158,137 +179,97 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
     setCurrentStep('preview')
   }
 
-  // Remove entire folder (inventory item)
   const removeFolder = (folderId: string) => {
     setSelectedFolders(prev => {
       const folderToRemove = prev.find(folder => folder.id === folderId)
-      if (folderToRemove) {
-        // Clean up preview URLs for all images in the folder
-        folderToRemove.images.forEach(img => URL.revokeObjectURL(img.preview))
-      }
-      
+      if (folderToRemove) folderToRemove.images.forEach(img => URL.revokeObjectURL(img.preview))
       return prev.filter(folder => folder.id !== folderId)
     })
   }
 
-  // Remove individual image from a folder
   const removeImageFromFolder = (folderId: string, imageId: string) => {
     setSelectedFolders(prev => prev.map(folder => {
-      if (folder.id === folderId) {
-        const imageToRemove = folder.images.find(img => img.id === imageId)
-        if (imageToRemove) {
-          URL.revokeObjectURL(imageToRemove.preview)
-        }
-
-        const updatedImages = folder.images.filter(img => img.id !== imageId)
-        // If no images left, remove the entire folder
-        if (updatedImages.length === 0) {
-          return null
-        }
-
-        return {
-          ...folder,
-          images: updatedImages
-        }
-      }
-      return folder
+      if (folder.id !== folderId) return folder
+      const imageToRemove = folder.images.find(img => img.id === imageId)
+      if (imageToRemove) URL.revokeObjectURL(imageToRemove.preview)
+      const updatedImages = folder.images.filter(img => img.id !== imageId)
+      if (updatedImages.length === 0) return null as any
+      const updatedSelected = new Set(folder.selectedImageIds || folder.images.map(i => i.id))
+      updatedSelected.delete(imageId)
+      return { ...folder, images: updatedImages, selectedImageIds: updatedSelected }
     }).filter(Boolean) as FolderItem[])
   }
 
-  // Edit individual item
+  // ── Edit / Preview handlers ───────────────────────────────────────────────
   const handleEditItem = (index: number) => {
     setEditingItemIndex(index)
     setCurrentStep('edit')
   }
 
-  // Handle save from edit form
   const handleEditFormSave = (updatedArtwork: any) => {
     if (editingItemIndex !== null) {
       const updatedResults = [...generatedResults]
-      updatedResults[editingItemIndex] = updatedArtwork
+      // Preserve the _folderId when updating
+      updatedResults[editingItemIndex] = {
+        ...updatedArtwork,
+        _folderId: generatedResults[editingItemIndex]._folderId
+      }
       setGeneratedResults(updatedResults)
     }
     setEditingItemIndex(null)
     setCurrentStep('complete')
   }
 
-  // Handle cancel from edit form
   const handleEditFormCancel = () => {
     setEditingItemIndex(null)
     setCurrentStep('complete')
   }
 
-  // Handle preview item
   const handlePreviewItem = (index: number) => {
     setPreviewingItemIndex(index)
     setCurrentStep('preview-dialog')
   }
 
-  // Handle close preview dialog
   const handleClosePreview = () => {
     setPreviewingItemIndex(null)
     setCurrentStep('complete')
   }
 
-  // Handle image edit
+  // ── Image edit ────────────────────────────────────────────────────────────
   const handleEditImage = (folderId: string, imageId: string) => {
     const folder = selectedFolders.find(f => f.id === folderId)
     const image = folder?.images.find(img => img.id === imageId)
-
     if (folder && image) {
-      setImageEditModal({
-        isOpen: true,
-        imageUrl: image.preview,
-        folderId,
-        imageId,
-        imageName: image.name
-      })
+      setImageEditModal({ isOpen: true, imageUrl: image.preview, folderId, imageId, imageName: image.name })
     }
   }
 
-  // Handle image update from ImageEditModal
   const handleImageUpdate = async (newImageUrl: string | null) => {
     if (!imageEditModal.folderId || !imageEditModal.imageId) return
-
     try {
       if (newImageUrl === null) {
-        // Delete image from folder
         setSelectedFolders(prev => prev.map(folder => {
-          if (folder.id === imageEditModal.folderId) {
-            return {
-              ...folder,
-              images: folder.images.filter(img => img.id !== imageEditModal.imageId)
-            }
-          }
-          return folder
+          if (folder.id !== imageEditModal.folderId) return folder
+          return { ...folder, images: folder.images.filter(img => img.id !== imageEditModal.imageId) }
         }))
       } else {
-        // Replace image in folder
         setSelectedFolders(prev => prev.map(folder => {
-          if (folder.id === imageEditModal.folderId) {
-            return {
-              ...folder,
-              images: folder.images.map(img =>
-                img.id === imageEditModal.imageId
-                  ? { ...img, preview: newImageUrl }
-                  : img
-              )
-            }
+          if (folder.id !== imageEditModal.folderId) return folder
+          return {
+            ...folder,
+            images: folder.images.map(img =>
+              img.id === imageEditModal.imageId ? { ...img, preview: newImageUrl } : img
+            )
           }
-          return folder
         }))
       }
-
-      // Close modal
       setImageEditModal(prev => ({ ...prev, isOpen: false }))
-
     } catch (error) {
       console.error('Failed to update image:', error)
-      // In a real app, you'd show an error message to the user
     }
   }
 
-  // Generate AI data for all folders (using first image from each folder)
+  // ── AI Generation ─────────────────────────────────────────────────────────
   const generateAIData = async () => {
     if (selectedFolders.length === 0) return
 
@@ -296,53 +277,41 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
     setCurrentStep('generating')
     setGenerationProgress(0)
 
-    const results: any[] = []
+    const results: GeneratedResult[] = []
 
     for (let i = 0; i < selectedFolders.length; i++) {
       const folder = selectedFolders[i]
-      
-      // Use the first image from the folder for AI analysis
       const firstImage = folder.images[0]
       if (!firstImage) continue
-      
+
       try {
-        // Create FormData for AI analysis (using only the first image)
         const formData = new FormData()
         formData.append('image', firstImage.file)
 
-        // Call AI analysis endpoint
         const token = localStorage.getItem('token')
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/items/ai-analyze`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: { 'Authorization': `Bearer ${token}` },
           body: formData,
         })
 
-        if (!response.ok) {
-          throw new Error(`AI analysis failed for ${folder.folderName}`)
-        }
+        if (!response.ok) throw new Error(`AI analysis failed for ${folder.folderName}`)
 
         const aiResult = await response.json()
-        
+
         if (aiResult.success) {
-          // Create artwork data with folder information
-          const artworkData = {
+          const artworkData: GeneratedResult = {
             ...aiResult.result,
+            _folderId: folder.id,       // ← stable ID reference
             folder: folder.folderName,
             original_filename: firstImage.name,
-            _folderImages: folder.images, // Keep all images for upload
-            _primaryImageFile: firstImage.file // Primary image for display
+            _primaryImageFile: firstImage.file
           }
 
           results.push(artworkData)
-          
-          // Update folder status
-          setSelectedFolders(prev => prev.map(f => 
-            f.id === folder.id 
-              ? { ...f, generated: true, aiData: artworkData }
-              : f
+
+          setSelectedFolders(prev => prev.map(f =>
+            f.id === folder.id ? { ...f, generated: true, aiData: artworkData } : f
           ))
         } else {
           console.error(`AI analysis failed for ${folder.folderName}:`, aiResult.error)
@@ -351,7 +320,6 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
         console.error(`Error processing ${folder.folderName}:`, error)
       }
 
-      // Update progress
       setGenerationProgress(((i + 1) / selectedFolders.length) * 100)
     }
 
@@ -360,8 +328,11 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
     setCurrentStep('complete')
   }
 
-  // Save all generated artworks to database and sync to Google Sheets
+  // ── Save ──────────────────────────────────────────────────────────────────
+  const handleSaveAllClick = () => setShowConfirmDialog(true)
+
   const saveAllArtworks = async () => {
+    setShowConfirmDialog(false)
     if (generatedResults.length === 0) return
 
     setIsGenerating(true)
@@ -370,91 +341,75 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
       const savedArtworks = []
 
       for (const artworkData of generatedResults) {
-        // Upload all images from the folder
+        // ← Use stable _folderId instead of reference equality
+        const correspondingFolder = getFolderById(artworkData._folderId)
+
+        const imagesToUpload = correspondingFolder
+          ? correspondingFolder.images.filter(img => isImageSelected(correspondingFolder, img.id))
+          : []
+
         const imageUrls: { [key: string]: string | string[] } = {}
-        
-        if (artworkData._folderImages && artworkData._folderImages.length > 0) {
+
+        if (imagesToUpload.length > 0) {
           const imageFormData = new FormData()
           const tempItemId = `temp_${Date.now()}_${Math.random()}`
           imageFormData.append('itemId', tempItemId)
 
-          // Add all images from the folder
-          artworkData._folderImages.forEach((image: ImageFile, index: number) => {
-            const fieldName = `image_file_${index + 1}`
-            imageFormData.append(fieldName, image.file)
+          imagesToUpload.forEach((image: ImageFile, index: number) => {
+            imageFormData.append(`image_file_${index + 1}`, image.file)
           })
 
           const token = localStorage.getItem('token')
           const imageResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/images/process-item-images`, {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
+            headers: { 'Authorization': `Bearer ${token}` },
             body: imageFormData,
           })
 
           if (imageResponse.ok) {
             const imageResult = await imageResponse.json()
             if (imageResult.success && imageResult.images) {
-              // Convert image result to images array format
               const imageArray: string[] = []
               Object.values(imageResult.images).forEach((url: any) => {
-                if (typeof url === 'string' && url.trim()) {
-                  imageArray.push(url.trim())
-                }
+                if (typeof url === 'string' && url.trim()) imageArray.push(url.trim())
               })
               imageUrls.images = imageArray
             }
           }
         }
 
-        // Create artwork in database
-        const artworkToSave = {
-          ...artworkData,
-          images: imageUrls.images || [], // Include images array
-          // ID will be auto-generated by database
-        }
+        // Strip internal tracking fields via destructuring — avoids TypeScript delete errors
+        const {
+          _folderId: _f,
+          _primaryImageFile: _p,
+          folder: _folder,
+          original_filename: _orig,
+          ...rest
+        } = artworkData as any
+        const artworkToSave = { ...rest, images: imageUrls.images || [] }
 
-        // Remove temporary fields
-        delete artworkToSave._folderImages
-        delete artworkToSave._primaryImageFile
-        delete artworkToSave.folder
-        delete artworkToSave.original_filename
-
-        // Save to database
         const token = localStorage.getItem('token')
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/items`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(artworkToSave),
         })
 
         if (response.ok) {
           const result = await response.json()
-          if (result.success) {
-            savedArtworks.push(result.data)
-          }
+          if (result.success) savedArtworks.push(result.data)
         }
       }
 
-      // Sync to Google Sheets
       if (savedArtworks.length > 0) {
         const syncResult = await syncArtworksToGoogleSheet(savedArtworks, undefined, brand)
-        if (!syncResult.success) {
-          console.warn('Google Sheets sync failed:', syncResult.error)
-          // Don't block the process, just log the warning
-        }
+        if (!syncResult.success) console.warn('Google Sheets sync failed:', syncResult.error)
       }
 
-      // Clean up preview URLs
       selectedFolders.forEach(folder => {
         folder.images.forEach(img => URL.revokeObjectURL(img.preview))
       })
 
-      // Complete the process
       onComplete(savedArtworks)
     } catch (error) {
       console.error('Error saving artworks:', error)
@@ -464,66 +419,112 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
     }
   }
 
-  // Generate next available lot number
-  const generateNextLotNumber = async (): Promise<string> => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/items?limit=1&sort_field=id&sort_direction=desc`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.data.length > 0) {
-          const lastLotNum = parseInt(data.data[0].id) || 0
-          return (lastLotNum + 1).toString()
-        }
-      }
-    } catch (error) {
-      console.error('Error getting last lot number:', error)
-    }
-    
-    return '1' // Default to 1 if no items exist
-  }
-
-
-
-  // Calculate total image count across all folders
   const totalImageCount = selectedFolders.reduce((total, folder) => total + folder.images.length, 0)
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-6xl max-h-[90vh] w-full mx-4 flex flex-col">
+    <div className="fixed inset-0 bg-black flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full mx-auto flex flex-col" style={{ maxHeight: '92vh' }}>
+
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">AI Bulk Generation</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Select folders to create inventory items. Each subfolder becomes one item with multiple images.
+            <h2 className="text-lg font-semibold text-gray-900">AI Bulk Generation</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Each subfolder becomes one inventory item with multiple images
             </p>
           </div>
-          <button
-            onClick={handleClose}
-            className="p-2 hover:bg-gray-100 rounded-full"
-          >
-            <X className="h-5 w-5" />
+          <button onClick={handleClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+            <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
 
+        {/* ── Confirmation Dialog ───────────────────────────────────────────── */}
+        {showConfirmDialog && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                  <ImageIcon className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Save All</h3>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-700 mb-3">
+                You're about to save{' '}
+                <span className="font-semibold text-gray-900">
+                  {generatedResults.length} inventory item{generatedResults.length !== 1 ? 's' : ''}
+                </span>.
+              </p>
+
+              {/* Per-item image summary */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                  <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Image Summary per Item</p>
+                </div>
+                <div className="max-h-44 overflow-y-auto divide-y divide-gray-100">
+                  {generatedResults.map((result, index) => {
+                    const folder = getFolderById(result._folderId)
+                    const selectedCount = folder ? getSelectedCount(folder) : 0
+                    const totalCount = folder?.images.length || 0
+                    const skipped = totalCount - selectedCount
+                    return (
+                      <div key={index} className="flex items-center justify-between px-3 py-2">
+                        <span className="text-xs text-gray-700 truncate max-w-[200px]">
+                          {result.title || `Item ${index + 1}`}
+                        </span>
+                        <span className={`text-xs font-medium shrink-0 ml-2 ${skipped > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                          {selectedCount}/{totalCount} images{skipped > 0 ? ` (${skipped} skipped)` : ''}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {generatedResults.some(result => {
+                const folder = getFolderById(result._folderId)
+                return folder && getSelectedCount(folder) < folder.images.length
+              }) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5 text-xs text-amber-700">
+                  <strong>Do you want to add the remaining images to this inventory?</strong>
+                </div>
+              )}
+
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowConfirmDialog(false)}
+                  className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveAllArtworks}
+                  className="px-4 py-2 text-sm rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-colors"
+                >
+                  Yes, Save All &amp; Sync
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Content */}
-        <div className="flex-1 overflow-hidden p-6">
+        <div className="flex-1 overflow-hidden px-6 py-5">
+
+          {/* ── SELECT STEP ─────────────────────────────────────────────────── */}
           {currentStep === 'select' && (
             <div className="h-full flex flex-col items-center justify-center">
               <div className="text-center mb-8">
-                <Upload className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Select Multiple Folders
-                </h3>
-                <p className="text-sm text-gray-600 max-w-md">
-                  Choose a parent folder containing subfolders (like ParentFolder/inv-1/, ParentFolder/inv-2/, etc.). 
-                  Each subfolder becomes one inventory item, with all its images uploaded but only the first used for AI analysis.
+                <div className="w-20 h-20 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-4">
+                  <Upload className="h-10 w-10 text-purple-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Select Folders or Files</h3>
+                <p className="text-sm text-gray-500 max-w-sm">
+                  Choose a parent folder containing subfolders. Each subfolder becomes one inventory item — all images are uploaded, but only the first is used for AI analysis.
                 </p>
               </div>
 
@@ -534,297 +535,325 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
                 accept="image/*"
                 onChange={handleFileSelection}
                 className="hidden"
-                {...({ webkitdirectory: "true" } as any)} // Allow folder selection
+                {...({ webkitdirectory: "true" } as any)}
               />
 
-              <div className="space-y-3">
+              <div className="flex gap-3">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  className="flex items-center px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors"
                 >
-                  <Upload className="h-5 w-5 mr-2" />
+                  <Upload className="h-4 w-4 mr-2" />
                   Select Folders
                 </button>
-                
                 <button
                   onClick={() => {
-                    // Reset input to allow file selection instead of folders
                     if (fileInputRef.current) {
                       fileInputRef.current.removeAttribute('webkitdirectory')
                       fileInputRef.current.click()
                       fileInputRef.current.setAttribute('webkitdirectory', 'true')
                     }
                   }}
-                  className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors"
                 >
-                  <Upload className="h-5 w-5 mr-2" />
+                  <Upload className="h-4 w-4 mr-2" />
                   Select Individual Files
                 </button>
               </div>
 
-              <p className="text-xs text-gray-500 mt-4 text-center max-w-sm">
-                Supported formats: JPG, PNG, GIF. Each subfolder becomes one inventory item with multiple images. 
-                First image per folder is used for AI analysis.
+              <p className="text-xs text-gray-400 mt-5 text-center max-w-xs">
+                Supported: JPG, PNG, GIF. First image per folder is used for AI analysis.
               </p>
             </div>
           )}
 
+          {/* ── PREVIEW STEP ─────────────────────────────────────────────────── */}
           {currentStep === 'preview' && (
-            <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col" style={{ maxHeight: 'calc(92vh - 130px)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Preview Selected Folders ({selectedFolders.length} items, {totalImageCount} images total)
-                </h3>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => setCurrentStep('select')}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                  >
-                    Back
-                  </button>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">
+                    {selectedFolders.length} item{selectedFolders.length !== 1 ? 's' : ''} selected
+                  </h3>
+                  <p className="text-xs text-gray-500">{totalImageCount} images total</p>
+                </div>
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                    className="flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition-colors"
                   >
-                    <Upload className="h-4 w-4 mr-2" />
+                    <Upload className="h-3.5 w-3.5 mr-1.5" />
                     Add More
                   </button>
                   <button
                     onClick={generateAIData}
                     disabled={selectedFolders.length === 0}
-                    className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                    className="flex items-center px-4 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium transition-colors"
                   >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate AI Details ({selectedFolders.length} items)
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    Generate AI Details ({selectedFolders.length})
                   </button>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto max-h-96 pr-2 space-y-4">
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
                 {selectedFolders.map((folder) => (
-                  <div key={folder.id} className="mb-6 border border-gray-200 rounded-lg p-4">
+                  <div key={folder.id} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-md font-medium text-gray-800 flex items-center">
-                        📁 {folder.folderName} 
-                        <span className="ml-2 text-sm text-gray-600">({folder.images.length} images)</span>
-                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          Inventory Item
-                        </span>
-                      </h4>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base">📁</span>
+                        <span className="font-medium text-gray-800 text-sm truncate">{folder.folderName}</span>
+                        <span className="text-xs text-gray-500 shrink-0">({folder.images.length} images)</span>
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full shrink-0">Item</span>
+                      </div>
                       <button
                         onClick={() => removeFolder(folder.id)}
-                        className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                        title="Remove entire folder"
+                        className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                        title="Remove folder"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+
+                    <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-2">
                       {folder.images.map((image, index) => (
                         <div key={image.id} className="relative group">
-                          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                            <img
-                              src={image.preview}
-                              alt={image.name}
-                              className="w-full h-full object-cover"
-                            />
+                          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                            <img src={image.preview} alt={image.name} className="w-full h-full object-cover" />
                           </div>
-
-                          {/* Show primary image indicator */}
                           {index === 0 && (
-                            <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                              AI Primary
+                            <div className="absolute top-1 left-1 bg-green-500 text-white rounded px-1 py-0.5" style={{ fontSize: '9px' }}>
+                              AI
                             </div>
                           )}
-
-                          {/* Always visible action buttons */}
-                          <div className="absolute top-2 right-2 flex space-x-1">
+                          <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => handleEditImage(folder.id, image.id)}
-                              className="p-1 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors"
+                              className="p-0.5 bg-blue-500 text-white rounded hover:bg-blue-600"
                               title="Edit image"
                             >
-                              <Edit3 className="h-3 w-3" />
+                              <Edit3 className="h-2.5 w-2.5" />
                             </button>
                             <button
                               onClick={() => removeImageFromFolder(folder.id, image.id)}
-                              className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                              title="Remove this image"
+                              className="p-0.5 bg-red-500 text-white rounded hover:bg-red-600"
+                              title="Remove"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-2.5 w-2.5" />
                             </button>
                           </div>
-
-                          <p className="text-xs text-gray-600 mt-1 truncate" title={image.name}>
-                            {image.name}
-                          </p>
                         </div>
                       ))}
                     </div>
-                    
-                    <div className="mt-3 text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                      ℹ️ First image will be used for AI analysis. All images will be uploaded to storage.
-                    </div>
+
+                    <p className="text-xs text-gray-400 mt-2">
+                      First image used for AI analysis · All images uploaded to storage
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
+          {/* ── GENERATING STEP ──────────────────────────────────────────────── */}
           {currentStep === 'generating' && (
             <div className="h-full flex flex-col items-center justify-center">
               <div className="text-center mb-8">
-                <Loader className="h-16 w-16 text-purple-600 mx-auto mb-4 animate-spin" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Generating AI Details
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Processing {selectedFolders.length} inventory items with AI analysis...
+                <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="h-8 w-8 text-purple-600 animate-pulse" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Generating AI Details</h3>
+                <p className="text-sm text-gray-500">
+                  Analysing {selectedFolders.length} items…
                 </p>
               </div>
 
-              <div className="w-full max-w-md">
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
+              <div className="w-full max-w-sm mb-6">
+                <div className="flex justify-between text-xs text-gray-500 mb-1.5">
                   <span>Progress</span>
                   <span>{Math.round(generationProgress)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-purple-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${generationProgress}%` }}
                   />
                 </div>
               </div>
 
-              <div className="mt-6 max-w-md">
-                <div className="text-sm text-gray-600 space-y-1">
-                  {selectedFolders.map((folder) => (
-                    <div key={folder.id} className="flex items-center space-x-2">
-                      {folder.generated ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Loader className="h-4 w-4 text-purple-600 animate-spin" />
-                      )}
-                      <span className={folder.generated ? 'text-green-600' : ''}>
-                        📁 {folder.folderName} ({folder.images.length} images)
-                      </span>
-                    </div>
-                  ))}
-                </div>
+              <div className="w-full max-w-sm space-y-1.5">
+                {selectedFolders.map((folder) => (
+                  <div key={folder.id} className="flex items-center gap-2 text-sm">
+                    {folder.generated
+                      ? <Check className="h-4 w-4 text-green-500 shrink-0" />
+                      : <Loader className="h-4 w-4 text-purple-500 animate-spin shrink-0" />}
+                    <span className={`truncate ${folder.generated ? 'text-green-600' : 'text-gray-600'}`}>
+                      📁 {folder.folderName}
+                    </span>
+                    <span className="text-xs text-gray-400 shrink-0">({folder.images.length} img)</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
+          {/* ── COMPLETE STEP ────────────────────────────────────────────────── */}
           {currentStep === 'complete' && (
-            <div className="h-full flex flex-col">
-              {/* Compact Header with Save Button */}
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <Check className="h-6 w-6 text-green-500" />
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900">
-                      AI Generation Complete
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {generatedResults.length} inventory items ready to save
-                    </p>
-                  </div>
+            <div className="h-full flex flex-col" style={{ maxHeight: 'calc(92vh - 130px)' }}>
+              {/* Sub-header */}
+              <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-gray-100">
+                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                  <Check className="h-4 w-4 text-green-600" />
                 </div>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={saveAllArtworks}
-                    disabled={isGenerating}
-                    className="flex items-center px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {isGenerating && <Loader className="h-4 w-4 mr-2 animate-spin" />}
-                    Save All & Sync
-                  </button>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Generation Complete</p>
+                  <p className="text-xs text-gray-500">{generatedResults.length} items ready · click images to select/deselect</p>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto max-h-[calc(90vh-200px)] mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {generatedResults.map((result, index) => {
-                    const correspondingFolder = selectedFolders.find(f => f.aiData === result)
-                    const primaryImage = correspondingFolder?.images[0]
-                    
-                    return (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex space-x-3">
-                          <div className="flex-shrink-0">
+              {/* Cards */}
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                {generatedResults.map((result, index) => {
+                  const correspondingFolder = getFolderById(result._folderId)
+                  const selectedCount = correspondingFolder ? getSelectedCount(correspondingFolder) : 0
+                  const totalCount = correspondingFolder?.images.length || 0
+
+                  return (
+                    <div key={index} className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+                      {/* Card top row */}
+                      <div className="flex items-start gap-4 p-5 pb-4">
+                        {/* Primary image thumbnail - bigger */}
+                        {correspondingFolder?.images[0] && (
+                          <div className="w-24 h-24 rounded-lg overflow-hidden border border-gray-200 shrink-0 bg-gray-100">
                             <img
-                              src={primaryImage?.preview || ''}
-                              alt={result.title}
-                              className="w-16 h-16 object-cover rounded"
+                              src={correspondingFolder.images[0].preview}
+                              alt="primary"
+                              className="w-full h-full object-cover"
                             />
-                            <div className="text-xs text-center text-gray-500 mt-1">
-                              +{correspondingFolder?.images.length || 0} images
-                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 truncate">
-                              {result.title}
-                            </h4>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {result.description}
-                            </p>
-                            <div className="text-xs text-gray-500 mt-1">
-                              Est: £{result.low_est} - £{result.high_est}
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h4 className="font-semibold text-gray-900 text-base truncate">{result.title}</h4>
+                              <p className="text-sm text-gray-500 mt-1 line-clamp-3">{result.description}</p>
                             </div>
-                            <div className="text-xs text-blue-600 mt-1">
-                              📁 {correspondingFolder?.folderName}
-                            </div>
-                            <div className="mt-2 flex space-x-2">
+                            <div className="flex gap-1.5 shrink-0">
                               <button
                                 onClick={() => handlePreviewItem(index)}
-                                className="flex items-center px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                                className="flex items-center px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
                               >
-                                <Eye className="h-3 w-3 mr-1" />
+                                <Eye className="h-3.5 w-3.5 mr-1" />
                                 Preview
                               </button>
                               <button
                                 onClick={() => handleEditItem(index)}
-                                className="flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                className="flex items-center px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
                               >
-                                <Edit3 className="h-3 w-3 mr-1" />
+                                <Edit3 className="h-3.5 w-3.5 mr-1" />
                                 Edit
                               </button>
                             </div>
                           </div>
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="text-sm text-gray-600 font-medium">Est: £{result.low_est?.toLocaleString()} – £{result.high_est?.toLocaleString()}</span>
+                            {correspondingFolder && (
+                              <span className="text-xs text-blue-600 truncate">📁 {correspondingFolder.folderName}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
+
+                      {/* Image selection strip */}
+                      {correspondingFolder && correspondingFolder.images.length > 0 && (
+                        <div className="px-5 pb-5 pt-1 border-t border-gray-100">
+                          <div className="flex items-center justify-between mb-2.5">
+                            <p className="text-xs font-medium text-gray-600">Images to save</p>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              selectedCount === totalCount ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {selectedCount}/{totalCount} selected
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {correspondingFolder.images.map((image, imgIndex) => {
+                              const selected = isImageSelected(correspondingFolder, image.id)
+                              const isPrimary = imgIndex === 0
+                              return (
+                                <div
+                                  key={image.id}
+                                  onClick={() => toggleImageSelection(correspondingFolder.id, image.id)}
+                                  title={isPrimary ? 'Primary image (always included)' : selected ? 'Click to deselect' : 'Click to select'}
+                                  className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+                                    selected
+                                      ? isPrimary ? 'border-green-500' : 'border-blue-400'
+                                      : 'border-gray-200 opacity-40 grayscale'
+                                  }`}
+                                  style={{ width: 100, height: 100 }}
+                                >
+                                  <img src={image.preview} alt={image.name} className="w-full h-full object-cover" />
+
+                                  {/* Primary badge */}
+                                  {isPrimary && (
+                                    <div className="absolute bottom-0 left-0 right-0 bg-green-500/80 text-white text-center" style={{ fontSize: '8px', padding: '1px 0' }}>
+                                      AI
+                                    </div>
+                                  )}
+
+                                  {/* Checkbox dot */}
+                                  <div className={`absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                                    selected ? 'bg-blue-500 border-blue-500' : 'bg-white/80 border-gray-400'
+                                  }`}>
+                                    {selected && <Check className="h-2 w-2 text-white" />}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          <p className="text-xs text-gray-400 mt-1.5">
+                            Click images to select or deselect · Primary image always included
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+              {/* Footer */}
+              <div className="flex justify-between items-center pt-3 mt-3 border-t border-gray-100">
                 <button
                   onClick={() => setCurrentStep('preview')}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg"
+                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  Back to Preview
+                  ← Back to Preview
+                </button>
+                <button
+                  onClick={handleSaveAllClick}
+                  disabled={isGenerating}
+                  className="flex items-center px-5 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
+                >
+                  {isGenerating && <Loader className="h-3.5 w-3.5 mr-2 animate-spin" />}
+                  Save All &amp; Sync
                 </button>
               </div>
             </div>
           )}
 
+          {/* ── EDIT STEP ────────────────────────────────────────────────────── */}
           {currentStep === 'edit' && editingItemIndex !== null && (
-            <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col" style={{ maxHeight: 'calc(92vh - 130px)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Edit Item Details
-                </h3>
-                <button
-                  onClick={handleEditFormCancel}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
+                <h3 className="text-base font-semibold text-gray-900">Edit Item Details</h3>
+                <button onClick={handleEditFormCancel} className="text-sm text-gray-500 hover:text-gray-700">
                   Cancel
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <div className="flex-1 overflow-y-auto">
                 <ItemForm
                   mode="create"
                   initialData={{
@@ -832,8 +861,11 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
                     description: generatedResults[editingItemIndex]?.description || '',
                     low_est: generatedResults[editingItemIndex]?.low_est?.toString() || '',
                     high_est: generatedResults[editingItemIndex]?.high_est?.toString() || '',
-                    start_price: generatedResults[editingItemIndex]?.start_price?.toString() || Math.round((generatedResults[editingItemIndex]?.low_est || 0) * 0.5).toString(),
-                    artist_id: generatedResults[editingItemIndex]?.artist_id ? parseInt(generatedResults[editingItemIndex].artist_id.toString()) : undefined,
+                    start_price: generatedResults[editingItemIndex]?.start_price?.toString() ||
+                      Math.round((generatedResults[editingItemIndex]?.low_est || 0) * 0.5).toString(),
+                    artist_id: generatedResults[editingItemIndex]?.artist_id
+                      ? parseInt(generatedResults[editingItemIndex].artist_id.toString())
+                      : undefined,
                     height_inches: generatedResults[editingItemIndex]?.height_inches || '',
                     width_inches: generatedResults[editingItemIndex]?.width_inches || '',
                     height_cm: generatedResults[editingItemIndex]?.height_cm || '',
@@ -847,8 +879,10 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
                     condition: generatedResults[editingItemIndex]?.condition || '',
                     category: generatedResults[editingItemIndex]?.category || '',
                     status: 'draft',
-                    // Add the primary image from the corresponding folder
-                    images: selectedFolders[editingItemIndex]?.images[0]?.preview ? [selectedFolders[editingItemIndex].images[0].preview] : []
+                    images: (() => {
+                      const folder = getFolderById(generatedResults[editingItemIndex]?._folderId)
+                      return folder?.images[0]?.preview ? [folder.images[0].preview] : []
+                    })()
                   }}
                   onSave={handleEditFormSave}
                   onCancel={handleEditFormCancel}
@@ -857,7 +891,7 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
             </div>
           )}
 
-          {/* Image Edit Modal */}
+          {/* ── IMAGE EDIT MODAL ─────────────────────────────────────────────── */}
           <ImageEditModal
             isOpen={imageEditModal.isOpen}
             onClose={() => setImageEditModal(prev => ({ ...prev, isOpen: false }))}
@@ -868,190 +902,143 @@ export default function AIBulkGenerationModal({ onClose, onComplete }: AIBulkGen
             onImageUpdate={handleImageUpdate}
           />
 
-
+          {/* ── PREVIEW DIALOG STEP ──────────────────────────────────────────── */}
           {currentStep === 'preview-dialog' && previewingItemIndex !== null && (
-            <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col" style={{ maxHeight: 'calc(92vh - 130px)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Item Preview: {generatedResults[previewingItemIndex]?.title}
+                <h3 className="text-base font-semibold text-gray-900 truncate mr-4">
+                  {generatedResults[previewingItemIndex]?.title}
                 </h3>
-                <button
-                  onClick={handleClosePreview}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  Close
-                </button>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => { handleClosePreview(); handleEditItem(previewingItemIndex) }}
+                    className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button onClick={handleClosePreview} className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">
+                    Close
+                  </button>
+                </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <div className="flex-1 overflow-y-auto space-y-5">
                 {(() => {
                   const item = generatedResults[previewingItemIndex]
-                  const correspondingFolder = selectedFolders.find(f => f.aiData === item)
-                  const primaryImage = correspondingFolder?.images[0]
+                  const correspondingFolder = getFolderById(item._folderId)
 
                   return (
-                    <div className="space-y-6">
-                      {/* Image Preview */}
-                      <div className="flex justify-center">
-                        <div className="relative max-w-md">
-                          <img
-                            src={primaryImage?.preview || ''}
-                            alt={item.title}
-                            className="w-full h-auto max-h-96 object-contain rounded-lg border"
-                          />
-                          <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
-                            Primary Image
-                          </div>
-                          <div className="text-xs text-center text-gray-500 mt-2">
-                            +{correspondingFolder?.images.length || 0} total images
+                    <>
+                      {/* All images */}
+                      {correspondingFolder && correspondingFolder.images.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                            All Images ({correspondingFolder.images.length})
+                          </h4>
+                          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                            {correspondingFolder.images.map((image, imgIndex) => (
+                              <div key={image.id} className="relative">
+                                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                                  <img src={image.preview} alt={image.name} className="w-full h-full object-cover" />
+                                </div>
+                                {imgIndex === 0 && (
+                                  <div className="absolute top-1 left-1 bg-green-500 text-white rounded px-1 py-0.5" style={{ fontSize: '9px' }}>
+                                    AI
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
+                      )}
 
-                      {/* Item Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Left Column */}
+                      {/* Details grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-4">
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">Basic Information</h4>
-                            <div className="space-y-2 text-sm">
-                              <div>
-                                <span className="font-medium text-gray-600">Title:</span>
-                                <p className="text-gray-900">{item.title}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Category:</span>
-                                <p className="text-gray-900">{item.category}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Materials:</span>
-                                <p className="text-gray-900">{item.materials}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Condition:</span>
-                                <p className="text-gray-900">{item.condition}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Period/Age:</span>
-                                <p className="text-gray-900">{item.period_age}</p>
-                              </div>
-                            </div>
-                          </div>
+                          <section>
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Basic Information</h4>
+                            <dl className="space-y-1.5 text-sm">
+                              {[
+                                ['Title', item.title],
+                                ['Category', item.category],
+                                ['Materials', item.materials],
+                                ['Condition', item.condition],
+                                ['Period / Age', item.period_age],
+                              ].filter(([, v]) => v).map(([label, val]) => (
+                                <div key={label as string}>
+                                  <dt className="text-xs text-gray-500">{label}</dt>
+                                  <dd className="text-gray-900">{val}</dd>
+                                </div>
+                              ))}
+                            </dl>
+                          </section>
 
-                          {/* Dimensions */}
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">Dimensions</h4>
-                            <div className="space-y-2 text-sm">
+                          <section>
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dimensions</h4>
+                            <dl className="space-y-1.5 text-sm">
                               {(item.height_inches || item.width_inches) && (
                                 <div>
-                                  <span className="font-medium text-gray-600">Size (inches):</span>
-                                  <p className="text-gray-900">
-                                    {item.height_inches || '?'} × {item.width_inches || '?'} in
-                                  </p>
+                                  <dt className="text-xs text-gray-500">Size (inches)</dt>
+                                  <dd className="text-gray-900">{item.height_inches || '?'} × {item.width_inches || '?'} in</dd>
                                 </div>
                               )}
                               {(item.height_cm || item.width_cm) && (
                                 <div>
-                                  <span className="font-medium text-gray-600">Size (cm):</span>
-                                  <p className="text-gray-900">
-                                    {item.height_cm || '?'} × {item.width_cm || '?'} cm
-                                  </p>
-                                </div>
-                              )}
-                              {(item.height_with_frame_inches || item.width_with_frame_inches) && (
-                                <div>
-                                  <span className="font-medium text-gray-600">With Frame (inches):</span>
-                                  <p className="text-gray-900">
-                                    {item.height_with_frame_inches || '?'} × {item.width_with_frame_inches || '?'} in
-                                  </p>
+                                  <dt className="text-xs text-gray-500">Size (cm)</dt>
+                                  <dd className="text-gray-900">{item.height_cm || '?'} × {item.width_cm || '?'} cm</dd>
                                 </div>
                               )}
                               {item.weight && (
                                 <div>
-                                  <span className="font-medium text-gray-600">Weight:</span>
-                                  <p className="text-gray-900">{item.weight}</p>
+                                  <dt className="text-xs text-gray-500">Weight</dt>
+                                  <dd className="text-gray-900">{item.weight}</dd>
                                 </div>
                               )}
-                            </div>
-                          </div>
+                            </dl>
+                          </section>
                         </div>
 
-                        {/* Right Column */}
                         <div className="space-y-4">
-                          {/* Pricing */}
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">Pricing</h4>
-                            <div className="space-y-2 text-sm">
+                          <section>
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pricing</h4>
+                            <dl className="space-y-1.5 text-sm">
                               <div>
-                                <span className="font-medium text-gray-600">Low Estimate:</span>
-                                <p className="text-gray-900">£{item.low_est?.toLocaleString()}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">High Estimate:</span>
-                                <p className="text-gray-900">£{item.high_est?.toLocaleString()}</p>
+                                <dt className="text-xs text-gray-500">Estimate</dt>
+                                <dd className="text-gray-900 font-medium">£{item.low_est?.toLocaleString()} – £{item.high_est?.toLocaleString()}</dd>
                               </div>
                               {item.start_price && (
                                 <div>
-                                  <span className="font-medium text-gray-600">Starting Price:</span>
-                                  <p className="text-gray-900">£{item.start_price?.toLocaleString()}</p>
+                                  <dt className="text-xs text-gray-500">Starting Price</dt>
+                                  <dd className="text-gray-900">£{item.start_price?.toLocaleString()}</dd>
                                 </div>
                               )}
-                            </div>
-                          </div>
+                            </dl>
+                          </section>
 
-                          {/* Artist Info */}
-                          {item.artist_id && (
-                            <div>
-                              <h4 className="font-semibold text-gray-900 mb-2">Artist Information</h4>
-                              <div className="text-sm">
-                                <span className="font-medium text-gray-600">Artist ID:</span>
-                                <p className="text-gray-900">{item.artist_id}</p>
+                          <section>
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Source</h4>
+                            <dl className="space-y-1.5 text-sm">
+                              <div>
+                                <dt className="text-xs text-gray-500">Folder</dt>
+                                <dd className="text-gray-900">{correspondingFolder?.folderName}</dd>
                               </div>
-                            </div>
-                          )}
-
-                          {/* Folder Info */}
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">Source Information</h4>
-                            <div className="text-sm">
-                              <span className="font-medium text-gray-600">Folder:</span>
-                              <p className="text-gray-900">{correspondingFolder?.folderName}</p>
-                              <span className="font-medium text-gray-600">Original Filename:</span>
-                              <p className="text-gray-900">{item.original_filename}</p>
-                            </div>
-                          </div>
+                              <div>
+                                <dt className="text-xs text-gray-500">Original File</dt>
+                                <dd className="text-gray-900">{item.original_filename}</dd>
+                              </div>
+                            </dl>
+                          </section>
                         </div>
                       </div>
 
                       {/* Description */}
-                      <div>
-                        <h4 className="font-semibold text-gray-900 mb-2">Description</h4>
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">
-                            {item.description}
-                          </p>
+                      <section>
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Description</h4>
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">{item.description}</p>
                         </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex justify-end space-x-3 pt-4 border-t">
-                        <button
-                          onClick={handleClosePreview}
-                          className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg"
-                        >
-                          Close Preview
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleClosePreview()
-                            handleEditItem(previewingItemIndex)
-                          }}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                        >
-                          Edit This Item
-                        </button>
-                      </div>
-                    </div>
+                      </section>
+                    </>
                   )
                 })()}
               </div>

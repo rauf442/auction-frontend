@@ -242,20 +242,16 @@ const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
   })
 }
 
-// Auto-update preview when brightness, rotation or crop changes - REALTIME
+  // Auto-update preview when brightness, rotation or crop changes
 useEffect(() => {
-  if (!crop || !imgRef.current) return
-  
-  // Only process if we have actual dimensions
-  if (crop.width === 0 || crop.height === 0) return
-  
+  if (!completedCrop || !imgRef.current) return
   try {
-    const canvas = getCroppedCanvas(imgRef.current, crop as PixelCrop, rotation, brightness)
+    const canvas = getCroppedCanvas(imgRef.current, completedCrop, rotation, brightness)
     setCroppedImageUrl(canvas.toDataURL('image/jpeg', 0.9))
   } catch (error) {
     console.error('Auto preview failed:', error)
   }
-}, [crop, brightness, rotation])
+}, [brightness, rotation, completedCrop])
 
   const handleRotate = (degrees: number) => {
     setRotation(prev => prev + degrees)
