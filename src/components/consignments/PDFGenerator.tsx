@@ -72,10 +72,11 @@ interface PDFGeneratorProps {
 // Save signature to backend
 async function saveSignature(consignmentId: string, consignorSignature: string): Promise<void> {
   const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
+  const token = localStorage.getItem("token")
   const response = await fetch(`${apiBase}/api/consignments/${consignmentId}/sign`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    // credentials: 'include',
     body: JSON.stringify({ consignor_signature: consignorSignature })
   })
   if (!response.ok) {
