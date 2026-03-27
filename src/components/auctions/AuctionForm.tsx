@@ -246,6 +246,7 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
   const [artworkSearchQuery, setArtworkSearchQuery] = useState('')
   const [artworksLoading, setArtworksLoading] = useState(false)
   const [showArtworkSearch, setShowArtworkSearch] = useState(false)
+  const [bulkSelected, setBulkSelected] = useState<number[]>([])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -349,10 +350,26 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
 
   const removeSelectedArtwork = (artworkId: number) => {
     setSelectedArtworks(prev => prev.filter(id => id !== artworkId))
+    setBulkSelected(prev => prev.filter(id => id !== artworkId))
   }
 
   const getSelectedArtworkDetails = () => {
     return artworks.filter(artwork => selectedArtworks.includes(Number(artwork.id!)))
+  }
+
+  const handleBulkDelete = () => {
+    setSelectedArtworks(prev => prev.filter(id => !bulkSelected.includes(id)))
+    setBulkSelected([])
+  }
+
+  const toggleBulkSelect = (artworkId: number) => {
+    setBulkSelected(prev =>
+      prev.includes(artworkId) ? prev.filter(id => id !== artworkId) : [...prev, artworkId]
+    )
+  }
+
+  const handleSelectAll = (checked: boolean) => {
+    setBulkSelected(checked ? [...selectedArtworks] : [])
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -422,6 +439,8 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
       }]
     }))
   }
+
+  const isAllSelected = selectedArtworks.length > 0 && bulkSelected.length === selectedArtworks.length
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -626,6 +645,7 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
             </div>
           </div>
 
+          {/* ── Auction Artworks ── */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-4 border-b border-amber-100">
               <div className="flex items-center justify-between">
@@ -634,7 +654,33 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
                   <h2 className="text-xl font-semibold text-gray-900">Auction Artworks</h2>
                   <span className="bg-amber-100 text-amber-800 text-sm font-medium px-2 py-1 rounded-full">{selectedArtworks.length} selected</span>
                 </div>
-                <Button type="button" onClick={() => setShowArtworkSearch(!showArtworkSearch)} variant="outline" icon={showArtworkSearch ? X : Plus} className="!py-2 !px-4 !text-sm">{showArtworkSearch ? 'Close Search' : 'Add Inventory'}</Button>
+                <div className="flex items-center gap-3">
+                  {/* Bulk controls — only shown when there are artworks */}
+                  {selectedArtworks.length > 0 && (
+                    <>
+                      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 accent-amber-500"
+                        />
+                        Select all
+                      </label>
+                      {bulkSelected.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleBulkDelete}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete {bulkSelected.length}
+                        </button>
+                      )}
+                    </>
+                  )}
+                  <Button type="button" onClick={() => setShowArtworkSearch(!showArtworkSearch)} variant="outline" icon={showArtworkSearch ? X : Plus} className="!py-2 !px-4 !text-sm">{showArtworkSearch ? 'Close Search' : 'Add Inventory'}</Button>
+                </div>
               </div>
             </div>
             <div className="p-6 space-y-6">
@@ -661,9 +707,20 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
                       const lotNumber = selectedArtworks.indexOf(Number(artwork.id)) + 1;
                       const formattedLot = lotNumber.toString().padStart(4, '0');
                       const imageSrc = artwork.images && artwork.images.length > 0 ? artwork.images[0] : artwork.image_file_1 || '';
+                      const isBulkChecked = bulkSelected.includes(Number(artwork.id))
                       return (
-                        <div key={artwork.id} className="group bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 hover:border-gray-300 flex flex-col">
+                        <div
+                          key={artwork.id}
+                          className={`group bg-white border-2 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer ${isBulkChecked ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-gray-300'}`}
+                          onClick={() => toggleBulkSelect(Number(artwork.id))}
+                        >
                           <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                            {/* Checkbox overlay */}
+                            <div className="absolute top-2 left-2 z-10">
+                              <div className={`h-5 w-5 rounded border-2 flex items-center justify-center transition-colors ${isBulkChecked ? 'bg-amber-500 border-amber-500' : 'bg-white border-gray-300'}`}>
+                                {isBulkChecked && <Check className="h-3 w-3 text-white" />}
+                              </div>
+                            </div>
                             {imageSrc ? (
                               <MediaRenderer src={imageSrc} alt={artwork.title || 'Untitled'} aspectRatio="square" showControls={false} className="w-full h-full object-cover" />
                             ) : (
@@ -675,13 +732,19 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
                             {artwork.artist_maker && <p className="text-sm text-gray-600 mt-1 line-clamp-1">{artwork.artist_maker}</p>}
                             <p className="text-sm text-gray-600 mt-1">Est: £{artwork.low_est || 0}-{artwork.high_est || 0}</p>
                             <div className="min-h-[2.5rem] mt-2">
-      {(artwork as any).description && (artwork as any).description !== artwork.title && (
-        <p className="text-xs text-gray-500 line-clamp-2">
-          {(artwork as any).description}
-        </p>
-      )}
-    </div>
-                            <button type="button" onClick={() => removeSelectedArtwork(Number(artwork.id))} className="mt-auto w-full py-1.5 px-3 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-md transition-colors flex items-center justify-center"><Trash2 className="h-4 w-4 mr-1" />Remove</button>
+                              {(artwork as any).description && (artwork as any).description !== artwork.title && (
+                                <p className="text-xs text-gray-500 line-clamp-2">
+                                  {(artwork as any).description}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removeSelectedArtwork(Number(artwork.id)) }}
+                              className="mt-auto w-full py-1.5 px-3 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-md transition-colors flex items-center justify-center"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />Remove
+                            </button>
                           </div>
                         </div>
                       );
@@ -697,13 +760,14 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
                   <p className="mt-1 text-sm text-gray-500">Click "Add Inventory" to browse and select artworks for this auction.</p>
                 </div>
               )}
+
               {selectedArtworks.length > 0 && (
                 <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
-  <span className="text-sm text-gray-500">Artworks in auction:</span>
-  <span className="bg-amber-100 text-amber-800 text-sm font-semibold px-3 py-1 rounded-full">
-    {selectedArtworks.length} item{selectedArtworks.length !== 1 ? 's' : ''}
-  </span>
-</div>
+                  <span className="text-sm text-gray-500">Artworks in auction:</span>
+                  <span className="bg-amber-100 text-amber-800 text-sm font-semibold px-3 py-1 rounded-full">
+                    {selectedArtworks.length} item{selectedArtworks.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
               )}
             </div>
           </div>
