@@ -737,4 +737,4 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
       </div>
     </div>
   )
-}
+} 
