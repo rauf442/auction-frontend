@@ -697,6 +697,14 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
                   <p className="mt-1 text-sm text-gray-500">Click "Add Inventory" to browse and select artworks for this auction.</p>
                 </div>
               )}
+              {selectedArtworks.length > 0 && (
+                <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
+  <span className="text-sm text-gray-500">Artworks in auction:</span>
+  <span className="bg-amber-100 text-amber-800 text-sm font-semibold px-3 py-1 rounded-full">
+    {selectedArtworks.length} item{selectedArtworks.length !== 1 ? 's' : ''}
+  </span>
+</div>
+              )}
             </div>
           </div>
 
@@ -737,4 +745,4 @@ export default function AuctionForm({ auction, onSave, onCancel, initialSelected
       </div>
     </div>
   )
-} 
+}
